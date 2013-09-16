@@ -1,5 +1,0 @@
-<?xml version="1.0"?>
-<CONFIG>
-  <Compiler Value="C:\codetyphon\fpc\bin\i386-win32\fpc.exe" Date="1099793117"/>
-  <Params Value=" -MObjFPC -Scagi -O1 -g -gl -WG -vewnhi -FuC:\tranquilit\pltis_python4delphi\lib\i386-win32 -FuC:\codetyphon\lazarus\lcl\units\i386-win32\win32 -FuC:\codetyphon\lazarus\lcl\units\i386-win32 -FuC:\codetyphon\lazarus\components\lazutils\lib\i386-win32 -FuC:\codetyphon\lazarus\packager\units\i386-win32 -FuC:\tranquilit\pltis_python4delphi\PythonForDelphi\Demos\FPC\Demo25\ -l -dLCL -dLCLwin32 project1.lpr"/>
-</CONFIG>

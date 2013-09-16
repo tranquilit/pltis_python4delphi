@@ -47,6 +47,9 @@ uses
 type
   TSequenceType = (stTuple, stList);
 
+const
+  NOARGS='--noarg--';
+
 { Python variant creation utils }
 function VarPythonCreate( AObject : PPyObject ) : Variant; overload;
 function VarPythonCreate( const AValue : Variant ) : Variant; overload;
@@ -124,12 +127,13 @@ type
   end;
   TNamedParamArray = array of TNamedParamDesc;
 
-{$IFDEF DELPHIXE2_OR_HIGHER}
-  {$DEFINE USESYSTEMDISPINVOKE}  //Delphi 2010 DispInvoke is buggy
-{$ENDIF}
-{$IF DEFINED(FPC_FULLVERSION) and (FPC_FULLVERSION >= 20500)}
-  {$DEFINE USESYSTEMDISPINVOKE}
-{$IFEND}
+
+{.$IFDEF DELPHIXE2_OR_HIGHER}
+  {.$DEFINE USESYSTEMDISPINVOKE}  //Delphi 2010 DispInvoke is buggy
+{.$ENDIF}
+{.$IF DEFINED(FPC_FULLVERSION) and (FPC_FULLVERSION >= 20500)}
+  {.$DEFINE USESYSTEMDISPINVOKE}
+{.$IFEND}
 
   { Python variant type handler }
   TPythonVariantType = class(TInvokeableVariantType, IVarInstanceReference)
@@ -993,8 +997,9 @@ procedure TPythonVariantType.DispInvoke(Dest: PVarData;
         // property get or function with 0 argument
         else if LArgCount = 0 then
         begin
-          if not GetProperty(Dest^, Source, LIdent) and
-             not DoFunction(Dest^, Source, LIdent, VarParams) then
+          if not GetProperty(Dest^, Source, LIdent)
+            and not DoFunction(Dest^, Source, LIdent, VarParams)
+             then
             RaiseDispError;
         end
 
@@ -1111,7 +1116,8 @@ var
     begin
       LNamePtr := LNamePtr + Succ(StrLen(LNamePtr));
       fNamedParams[I-LNamedArgStart].Index := I;
-      fNamedParams[I-LNamedArgStart].Name  := AnsiString(LNamePtr);
+      //Tranquil IT Hack : named params in lowercase, the pascal compiler switches all named params to uppercase by default
+      fNamedParams[I-LNamedArgStart].Name  := lowercase(AnsiString(LNamePtr));
     end;
 
     // error is an easy expansion
@@ -1215,6 +1221,7 @@ var
   I, LArgCount: Integer;
   LIdent: AnsiString;
   LTemp: TVarData;
+  docall:Boolean;
 begin
   //------------------------------------------------------------------------------------
   // Note that this method is mostly a copy&paste from  TInvokeableVariantType.DispInvoke
@@ -1240,6 +1247,17 @@ begin
   SetLength(LStrings, LArgCount);
   for I := 0 to LArgCount - 1 do
     ParseParam(I);
+
+  // Hack Tranquil IT to call a python method with no arguments, we use a s'well known' string argument --noargs--
+  //   because pascal compiler doesn't make difference between access to a property and call of method without argument
+  if (LArgCount=1) and (LArguments[0].VType = varOleStr) and (Widestring(LArguments[0].VSTRING)=NOARGS) then
+  begin
+    LArgCount:=0;
+    SetLength(LArguments,0);
+    docall:=True;
+  end
+  else
+    docall :=False;
 
   // What type of invoke is this?
   case CallDesc^.CallType of
@@ -1271,8 +1289,10 @@ begin
       // property get or function with 0 argument
       else if LArgCount = 0 then
       begin
-        if not GetProperty(Dest^, Source, string(LIdent)) and
-           not DoFunction(Dest^, Source, string(LIdent), LArguments) then
+        //hack Tranquil IT ... first DoFunction then GetProperty if '--noargs--' is passed as first parameter
+        if not (docall and DoFunction(Dest^, Source, string(LIdent), LArguments)) and
+          not GetProperty(Dest^, Source, string(LIdent))
+          and not DoFunction(Dest^, Source, string(LIdent), LArguments) then
           RaiseDispError;
       end
 

@@ -10,3 +10,5 @@ __history
 bin/*
 .svn/
 lib/
+
+/PythonForDelphi/Demos/FPC/Demo06/*.compiled
