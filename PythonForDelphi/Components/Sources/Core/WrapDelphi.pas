@@ -742,9 +742,6 @@ Type
      Method RegisterDelphiClass can be used to extend its functionality.
      Method RegisterEventHandler can be used to add event handling functionality
   }
-  {$IF not Defined(FPC) and (CompilerVersion >= 23)}
-  [ComponentPlatformsAttribute(pidWin32 or pidWin64)]
-  {$IFEND}
   TPyDelphiWrapper = class(TEngineClient, IFreeNotificationSubscriber)
   private
     // Stores Delphi class registration information
