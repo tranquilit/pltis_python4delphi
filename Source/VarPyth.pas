@@ -123,8 +123,8 @@ type
     FCurrent: Variant;
   public
     constructor Create(const AValue: Variant);
-    function MoveNext: Boolean; inline;
-    function GetCurrent: Variant; inline;
+    function MoveNext: Boolean; {$ifndef fpc}inline;{$endif}
+    function GetCurrent: Variant; {$ifndef fpc}inline;{$endif}
     property Current: Variant read GetCurrent;
   end;
 
