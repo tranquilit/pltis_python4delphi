@@ -157,8 +157,7 @@ type
   {$IFEND}
 {$ENDIF}
 {$IF DEFINED(FPC_FULLVERSION) and (FPC_FULLVERSION >= 20500)}
-//  {$DEFINE USESYSTEMDISPINVOKE} // Hack Tranquil IT : to allow the hack code to be executed
-  {$DEFINE PATCHEDSYSTEMDISPINVOKE}
+  {.$DEFINE USESYSTEMDISPINVOKE}
 {$IFEND}
 
   { Python variant type handler }
@@ -1380,13 +1379,16 @@ var
       SetClearVarToEmptyParam(LArguments[I])
 
     // literal string
-    else if LArgType = varStrArg then
+    else if LArgType in [varStrArg,varustrarg] then
     begin
       with LStrings[LStrCount] do
         if LArgByRef then
         begin
           //BStr := StringToOleStr(PAnsiString(ParamPtr^)^);
-          BStr := WideString(System.Copy(PAnsiString(LParamPtr^)^, 1, MaxInt));
+          if LArgType = varustrarg then
+            BStr := WideString(System.Copy(PUnicodeString(LParamPtr)^, 1, MaxInt))
+          else
+            BStr := WideString(System.Copy(PAnsiString(LParamPtr^)^, 1, MaxInt));
           PStr := PAnsiString(LParamPtr^);
           LArguments[I].VType := varOleStr or varByRef;
           LArguments[I].VOleStr := @BStr;
@@ -1394,7 +1396,10 @@ var
         else
         begin
           //BStr := StringToOleStr(PAnsiString(LParamPtr)^);
-          BStr := WideString(System.Copy(PAnsiString(LParamPtr)^, 1, MaxInt));
+          if LArgType = varustrarg then
+            BStr := WideString(System.Copy(PUnicodeString(LParamPtr)^, 1, MaxInt))
+          else
+            BStr := WideString(System.Copy(PAnsiString(LParamPtr)^, 1, MaxInt));
           PStr := nil;
           LArguments[I].VType := varOleStr;
           if BStr = '' then
