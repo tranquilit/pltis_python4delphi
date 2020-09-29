@@ -1447,8 +1447,6 @@ var
     else
     begin
       LArguments[I].VType := LArgType;
-      WriteLn(LArgType); // TODO remove
-      WriteLn(IntToStr(CVarTypeToElementInfo[LArgType].Size)); // TODO remove
       case CVarTypeToElementInfo[LArgType].Size of
         1, 2, 4:
         begin
