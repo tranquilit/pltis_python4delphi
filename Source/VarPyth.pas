@@ -174,7 +174,7 @@ type
       const Arguments: TVarDataArray): PPyObject;
     function  VarDataToPythonObject( AVarData : TVarData ) : PPyObject;
     procedure PyhonVarDataCreate( var Dest : TVarData; AObject : PPyObject );
-    {$IFNDEF USESYSTEMDISPINVOKE}
+   {$IFNDEF USESYSTEMDISPINVOKE}
     procedure DoDispInvoke(Dest: PVarData; var Source: TVarData;
       CallDesc: PCallDesc; Params: Pointer); virtual;
     function GetPropertyWithArg(var Dest: TVarData; const V: TVarData;
@@ -604,7 +604,10 @@ end;
 
 function VarIsTrue(const AValue : Variant): Boolean;
 begin
-  Result := AValue; // the cast into a boolean will call the PyObject_IsTrue API.
+  if VarIsPython(AValue) then
+    Result := (GetPythonEngine.PyObject_IsTrue(TPythonVarData(AValue).VPython.PyObject)=1)
+  else
+    Result := AValue; // the cast into a boolean will call the PyObject_IsTrue API.
 end;
 
 function VarModuleHasObject(const AModule : Variant; aObj: AnsiString): Boolean;
@@ -1246,11 +1249,11 @@ procedure TPythonVariantType.DispInvoke(Dest: PVarData;
           // property get or function with 0 argument
           else if LArgCount = 0 then
           begin
-			//hack Tranquil IT ... first DoFunction then GetProperty if '--noargs--' is passed as first parameter
-        	if not (docall and DoFunction(Dest^, Source, string(LIdent), LArguments)) and
-          	not GetProperty(Dest^, Source, string(LIdent))
-          	and not DoFunction(Dest^, Source, string(LIdent), LArguments) then
-          	RaiseDispError;
+            //hack Tranquil IT ... first DoFunction then GetProperty if '--noargs--' is passed as first parameter
+            if not (docall and DoFunction(Dest^, Source, string(LIdent), LArguments)) and
+                         not GetProperty(Dest^, Source, string(LIdent))
+                         and not DoFunction(Dest^, Source, string(LIdent), LArguments) then
+                RaiseDispError;
           end
 
           // function with N arguments
@@ -1368,8 +1371,8 @@ var
       LNamePtr := LNamePtr + Succ(StrLen(LNamePtr));
       fNamedParams[I-LNamedArgStart].Index := I;
       fNamedParams[I-LNamedArgStart].Name  := AnsiString(LNamePtr);
-	  //Tranquil IT Hack : named params in lowercase, the pascal compiler switches all named params to uppercase by default
-	  fNamedParams[I-LNamedArgStart].Name  := lowercase(AnsiString(LNamePtr));
+      //Tranquil IT Hack : named params in lowercase, the pascal compiler switches all named params to uppercase by default
+      fNamedParams[I-LNamedArgStart].Name  := lowercase(AnsiString(LNamePtr));
     end;
 
     // error is an easy expansion
@@ -1537,8 +1540,10 @@ begin
       // property get or function with 0 argument
       else if LArgCount = 0 then
       begin
-        if not GetProperty(Dest^, Source, string(LIdent)) and
-           not DoFunction(Dest^, Source, string(LIdent), LArguments) then
+        //hack Tranquil IT ... first DoFunction then GetProperty if '--noargs--' is passed as first parameter
+        if not (docall and DoFunction(Dest^, Source, string(LIdent), LArguments)) and
+          not GetProperty(Dest^, Source, string(LIdent))
+          and not DoFunction(Dest^, Source, string(LIdent), LArguments) then
           RaiseDispError;
       end
 
