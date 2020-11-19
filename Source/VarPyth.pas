@@ -1616,7 +1616,11 @@ begin
       // So: myList[0] won't work, but myObj.MyList[0] will!!!
       if PySequence_Check(_prop) <> 0 then
       begin
+        {$ifdef VER_30}
         _result := PySequence_GetItem(_prop, Variant(AArg));
+        {$else}
+        _result := PySequence_GetItem(_prop, AArg.vint64);
+        {$endif}
         CheckError;
       end; // of if
     end; // of if
