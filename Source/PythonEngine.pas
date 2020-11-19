@@ -6084,7 +6084,7 @@ function TPythonEngine.VarRecAsPyObject( v : TVarRec ) : PPyObject;
 begin
   case v.VType of
     vtInteger:       Result := PyInt_FromLong( v.VInteger );
-    vtBoolean:       Result := PyInt_FromLong( Integer(v.VBoolean) );
+    vtBoolean:       Result := PyBool_FromLong( Integer(v.VBoolean) );
     vtChar:          Result := PyString_FromString( PAnsiChar(AnsiString(v.VChar)) );
     vtExtended:      Result := PyFloat_FromDouble( v.VExtended^ );
     vtString:
