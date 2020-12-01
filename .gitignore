@@ -12,6 +12,8 @@
 *.o
 *.ppu
 *.compiled
+*.dcr
+*.rsj
 
 # Generated source #
 ###################
@@ -45,3 +47,5 @@
 *.Patch
 *.#00
 *.pch
+FPC\FPC_Units\i386-win32-win32\WrapDelphi.rsj
+
