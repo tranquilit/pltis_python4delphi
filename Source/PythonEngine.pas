@@ -5615,6 +5615,8 @@ const
          '     return self.pyio.read(size)'+LF+
          '  def flush(self):' + LF +
          '     pass' + LF +
+         '  def isatty(self):' + LF +
+         '     return True' + LF +
          'sys.old_stdin=sys.stdin'+LF+
          'sys.old_stdout=sys.stdout'+LF+
          'sys.old_stderr=sys.stderr'+LF+
@@ -5840,7 +5842,7 @@ begin
     varShortInt,
     varWord,
     varLongWord,
-    varInteger:  Result := PyInt_FromLong( DeRefV );
+    varInteger:  Result := PyLong_FromLong( DeRefV );
     varInt64:    Result := PyLong_FromLongLong( DeRefV );
     varSingle,
     varDouble,
@@ -5921,8 +5923,8 @@ function TPythonEngine.PyObjectAsVariant( obj : PPyObject ) : Variant;
     begin
       member := PyObject_GetAttrString( obj, PAnsiChar(AMember) );
       CheckError(False);
-      if PyInt_Check(member) then
-        Result := PyInt_AsLong(member)
+      if PyLong_Check(member) then
+        Result := PyLong_AsLong(member)
       else
         raise EPythonError.CreateFmt('Unexpected type found in member %s of a time_struct object', [AMember]);
       Py_XDecRef(member);
@@ -5992,17 +5994,17 @@ function TPythonEngine.PyObjectAsVariant( obj : PPyObject ) : Variant;
     else if PyTuple_Check( obj ) and (PyTuple_Size(obj) = 9) then
       begin
         for i := 0 to 8 do
-          if not PyInt_Check(PyTuple_GetItem(obj, i)) then
+          if not PyLong_Check(PyTuple_GetItem(obj, i)) then
             Exit;
-        y   := PyInt_AsLong( PyTuple_GetItem(obj, 0) );
-        m   := PyInt_AsLong( PyTuple_GetItem(obj, 1) );
-        d   := PyInt_AsLong( PyTuple_GetItem(obj, 2) );
-        h   := PyInt_AsLong( PyTuple_GetItem(obj, 3) );
-        mi  := PyInt_AsLong( PyTuple_GetItem(obj, 4) );
-        sec := PyInt_AsLong( PyTuple_GetItem(obj, 5) );
-        wd  := PyInt_AsLong( PyTuple_GetItem(obj, 6) );
-        jd  := PyInt_AsLong( PyTuple_GetItem(obj, 7) );
-        dl  := PyInt_AsLong( PyTuple_GetItem(obj, 8) );
+        y   := PyLong_AsLong( PyTuple_GetItem(obj, 0) );
+        m   := PyLong_AsLong( PyTuple_GetItem(obj, 1) );
+        d   := PyLong_AsLong( PyTuple_GetItem(obj, 2) );
+        h   := PyLong_AsLong( PyTuple_GetItem(obj, 3) );
+        mi  := PyLong_AsLong( PyTuple_GetItem(obj, 4) );
+        sec := PyLong_AsLong( PyTuple_GetItem(obj, 5) );
+        wd  := PyLong_AsLong( PyTuple_GetItem(obj, 6) );
+        jd  := PyLong_AsLong( PyTuple_GetItem(obj, 7) );
+        dl  := PyLong_AsLong( PyTuple_GetItem(obj, 8) );
         if not (m   in [1..12]) or
            not (d   in [1..31]) or
            not (h   in [0..23]) or
@@ -6083,8 +6085,8 @@ end;
 function TPythonEngine.VarRecAsPyObject( v : TVarRec ) : PPyObject;
 begin
   case v.VType of
-    vtInteger:       Result := PyInt_FromLong( v.VInteger );
-    vtBoolean:       Result := PyBool_FromLong( Integer(v.VBoolean) );
+    vtInteger:       Result := PyLong_FromLong( v.VInteger );
+    vtBoolean:       Result := PyLong_FromLong( Integer(v.VBoolean) );
     vtChar:          Result := PyString_FromString( PAnsiChar(AnsiString(v.VChar)) );
     vtExtended:      Result := PyFloat_FromDouble( v.VExtended^ );
     vtString:
@@ -6436,7 +6438,7 @@ begin
   for i := 0 to size*8-1 do
     if GetBit(i) then
       begin
-        PyList_SetItem( Result, cpt, PyInt_FromLong(i) );
+        PyList_SetItem( Result, cpt, PyLong_FromLong(i) );
         Inc(cpt);
       end;
 end;
@@ -9677,9 +9679,9 @@ function pyio_GetTypesStats(self, args : PPyObject) : PPyObject;
       begin
         Result := PyTuple_New(4);
         PyTuple_SetItem( Result, 0, PyString_FromString(PAnsiChar(T.TypeName)) );
-        PyTuple_SetItem( Result, 1, PyInt_FromLong(T.InstanceCount) );
-        PyTuple_SetItem( Result, 2, PyInt_FromLong(T.CreateHits) );
-        PyTuple_SetItem( Result, 3, PyInt_FromLong(T.DeleteHits) );
+        PyTuple_SetItem( Result, 1, PyLong_FromLong(T.InstanceCount) );
+        PyTuple_SetItem( Result, 2, PyLong_FromLong(T.CreateHits) );
+        PyTuple_SetItem( Result, 3, PyLong_FromLong(T.DeleteHits) );
       end;
   end;
 

@@ -124,7 +124,7 @@ begin
   ClearMethods;
   with GetPythonEngine, RegisteredMethods do
     begin
-      Result := PyInt_FromLong(Count);
+      Result := PyLong_FromLong(Count);
     end;
 end;
 
@@ -146,7 +146,7 @@ begin
         begin
           Py_XINCREF(func);
           Add(func);
-          Result := PyInt_FromLong(Count);
+          Result := PyLong_FromLong(Count);
         end;
 end;
 
@@ -156,7 +156,7 @@ var
         s: string;
 begin
   Result := nil;
-  with GetPythonEngine do
+  with GetPythonEngine dso
     if (PyArg_ParseTuple( args, 'O',@func) = 0) or
        (RegisteredMethods.IndexOf(func) = -1) then
     begin
@@ -168,7 +168,7 @@ begin
         begin
           Py_XDECREF(func);
           Remove(func);
-          Result := PyInt_FromLong(Count);
+          Result := PyLong_FromLong(Count);
         end;
 end;
 
