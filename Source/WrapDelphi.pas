@@ -2918,7 +2918,7 @@ begin
   end;
 end;
 
-{$ELSE)}
+{$ELSE}
 function TPyDelphiMethodObject.Call(ob1, ob2: PPyObject): PPyObject;
 Var
   V : Variant;
