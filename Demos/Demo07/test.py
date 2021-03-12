@@ -1,5 +1,5 @@
 import sys
-print "Win version:", sys.winver
+print("Win version:", sys.winver)
 import spam
 print (spam.foo('hello world', 1))
 p = spam.CreatePoint( 10, 25 )
