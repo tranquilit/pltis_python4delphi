@@ -1,4 +1,4 @@
-{$I Definition.Inc}
+                              {$I Definition.Inc}
 
 unit VarPyth;
 
@@ -45,9 +45,6 @@ uses
 type
   TSequenceType = (stTuple, stList);
 
-const
-  NOARGS='--noarg--';
-
 { Python variant creation utils }
 function VarPythonCreate( AObject : PPyObject ) : Variant; overload;
 function VarPythonCreate( const AValue : Variant ) : Variant; overload;
@@ -71,7 +68,6 @@ function VarIsPythonTuple(const AValue: Variant): Boolean;
 function VarIsPythonList(const AValue: Variant): Boolean;
 function VarIsPythonDict(const AValue: Variant): Boolean;
 function VarIsPythonClass(const AValue: Variant): Boolean;
-function VarIsPythonInstance(const AValue: Variant): Boolean;
 function VarIsPythonMethod(const AValue: Variant): Boolean;
 function VarIsPythonFunction(const AValue: Variant): Boolean;
 function VarIsPythonModule(const AValue: Variant): Boolean;
@@ -123,8 +119,8 @@ type
     FCurrent: Variant;
   public
     constructor Create(const AValue: Variant);
-    function MoveNext: Boolean; {$ifndef fpc}inline;{$endif}
-    function GetCurrent: Variant; {$ifndef fpc}inline;{$endif}
+    function MoveNext: Boolean; inline;
+    function GetCurrent: Variant; inline;
     property Current: Variant read GetCurrent;
   end;
 
@@ -141,7 +137,7 @@ function VarPyIterate(const AValue: Variant): TVarPyEnumerateHelper;
 implementation
 
 uses
-  VarUtils, SysUtils, TypInfo, Classes;
+  SysUtils, TypInfo, Classes;
 
 type
   TNamedParamDesc = record
@@ -157,7 +153,7 @@ type
   {$IFEND}
 {$ENDIF}
 {$IF DEFINED(FPC_FULLVERSION) and (FPC_FULLVERSION >= 20500)}
-  {.$DEFINE USESYSTEMDISPINVOKE}
+  {$DEFINE USESYSTEMDISPINVOKE}
 {$IFEND}
 
   { Python variant type handler }
@@ -173,7 +169,7 @@ type
       const Arguments: TVarDataArray): PPyObject;
     function  VarDataToPythonObject( AVarData : TVarData ) : PPyObject;
     procedure PyhonVarDataCreate( var Dest : TVarData; AObject : PPyObject );
-   {$IFNDEF USESYSTEMDISPINVOKE}
+    {$IFNDEF USESYSTEMDISPINVOKE}
     procedure DoDispInvoke(Dest: PVarData; var Source: TVarData;
       CallDesc: PCallDesc; Params: Pointer); virtual;
     function GetPropertyWithArg(var Dest: TVarData; const V: TVarData;
@@ -242,7 +238,6 @@ type
 
     // non-destructive operations
     function Equal(const Right: TPythonData): Boolean;
-    function Compare(const Right: TPythonData): Integer;
     function LessThan(const Right: TPythonData): Boolean;
     function LessOrEqualThan(const Right: TPythonData): Boolean;
     function GreaterThan(const Right: TPythonData): Boolean;
@@ -438,13 +433,13 @@ end;
 function VarIsPythonString(const AValue: Variant): Boolean;
 begin
   Result := VarIsPython(AValue) and
-            GetPythonEngine.PyString_Check(ExtractPythonObjectFrom(AValue));
+            GetPythonEngine.PyUnicode_Check(ExtractPythonObjectFrom(AValue));
 end;
 
 function VarIsPythonInteger(const AValue: Variant): Boolean;
 begin
   Result := VarIsPython(AValue) and
-            GetPythonEngine.PyInt_Check(ExtractPythonObjectFrom(AValue));
+            GetPythonEngine.PyLong_Check(ExtractPythonObjectFrom(AValue));
 end;
 
 function VarIsPythonFloat(const AValue: Variant): Boolean;
@@ -476,12 +471,6 @@ begin
   Result := VarIsPython(AValue) and
             (GetPythonEngine.PyClass_Check(ExtractPythonObjectFrom(AValue))
              or (GetPythonEngine.PyObject_HasAttrString(ExtractPythonObjectFrom(AValue), '__bases__') <> 0));
-end;
-
-function VarIsPythonInstance(const AValue: Variant): Boolean;
-begin
-  Result := VarIsPython(AValue) and
-            GetPythonEngine.PyInstance_Check(ExtractPythonObjectFrom(AValue));
 end;
 
 function VarIsPythonMethod(const AValue: Variant): Boolean;
@@ -603,10 +592,7 @@ end;
 
 function VarIsTrue(const AValue : Variant): Boolean;
 begin
-  if VarIsPython(AValue) then
-    Result := (GetPythonEngine.PyObject_IsTrue(TPythonVarData(AValue).VPython.PyObject)=1)
-  else
-    Result := AValue; // the cast into a boolean will call the PyObject_IsTrue API.
+  Result := AValue; // the cast into a boolean will call the PyObject_IsTrue API.
 end;
 
 function VarModuleHasObject(const AModule : Variant; aObj: AnsiString): Boolean;
@@ -725,7 +711,7 @@ var
 begin
   with GetPythonEngine do
   begin
-    _module_name := PyString_FromString(PAnsiChar(AModule));
+    _module_name := PyUnicodeFromString(AModule);
     try
       _module := PyImport_Import(_module_name);
       CheckError;
@@ -1104,7 +1090,7 @@ begin
         begin
           PVarParm^.VType := varOleStr;
           Temp := VarArgGetValue(VAList, Pointer);
-          if PAnsiString(Temp)^ <> '' then
+          if AnsiString(Temp) <> '' then
           begin
             {
             This line causes a crash and is replaced with the one below in line with unicode strings
@@ -1248,11 +1234,9 @@ procedure TPythonVariantType.DispInvoke(Dest: PVarData;
           // property get or function with 0 argument
           else if LArgCount = 0 then
           begin
-            //hack Tranquil IT ... first DoFunction then GetProperty if '--noargs--' is passed as first parameter
-            if not (docall and DoFunction(Dest^, Source, string(LIdent), LArguments)) and
-                         not GetProperty(Dest^, Source, string(LIdent))
-                         and not DoFunction(Dest^, Source, string(LIdent), LArguments) then
-                RaiseDispError;
+            if not GetProperty(Dest^, Source, LIdent) and
+               not DoFunction(Dest^, Source, LIdent, VarParams) then
+              RaiseDispError;
           end
 
           // function with N arguments
@@ -1370,8 +1354,6 @@ var
       LNamePtr := LNamePtr + Succ(StrLen(LNamePtr));
       fNamedParams[I-LNamedArgStart].Index := I;
       fNamedParams[I-LNamedArgStart].Name  := AnsiString(LNamePtr);
-      //Tranquil IT Hack : named params in lowercase, the pascal compiler switches all named params to uppercase by default
-      fNamedParams[I-LNamedArgStart].Name  := lowercase(AnsiString(LNamePtr));
     end;
 
     // error is an easy expansion
@@ -1379,16 +1361,13 @@ var
       SetClearVarToEmptyParam(LArguments[I])
 
     // literal string
-    else if LArgType in [varStrArg,varustrarg] then
+    else if LArgType = varStrArg then
     begin
       with LStrings[LStrCount] do
         if LArgByRef then
         begin
           //BStr := StringToOleStr(PAnsiString(ParamPtr^)^);
-          if LArgType = varustrarg then
-            BStr := WideString(System.Copy(PUnicodeString(LParamPtr)^, 1, MaxInt))
-          else
-            BStr := WideString(System.Copy(PAnsiString(LParamPtr^)^, 1, MaxInt));
+          BStr := WideString(System.Copy(PAnsiString(LParamPtr^)^, 1, MaxInt));
           PStr := PAnsiString(LParamPtr^);
           LArguments[I].VType := varOleStr or varByRef;
           LArguments[I].VOleStr := @BStr;
@@ -1396,10 +1375,7 @@ var
         else
         begin
           //BStr := StringToOleStr(PAnsiString(LParamPtr)^);
-          if LArgType = varustrarg then
-            BStr := WideString(System.Copy(PUnicodeString(LParamPtr)^, 1, MaxInt))
-          else
-            BStr := WideString(System.Copy(PAnsiString(LParamPtr)^, 1, MaxInt));
+          BStr := WideString(System.Copy(PAnsiString(LParamPtr)^, 1, MaxInt));
           PStr := nil;
           LArguments[I].VType := varOleStr;
           if BStr = '' then
@@ -1477,7 +1453,6 @@ var
   I, LArgCount: Integer;
   LIdent: AnsiString;
   LTemp: TVarData;
-  docall:Boolean;
 begin
   //------------------------------------------------------------------------------------
   // Note that this method is mostly a copy&paste from  TInvokeableVariantType.DispInvoke
@@ -1503,17 +1478,6 @@ begin
   SetLength(LStrings, LArgCount);
   for I := 0 to LArgCount - 1 do
     ParseParam(I);
-
-  // Hack Tranquil IT to call a python method with no arguments, we use a s'well known' string argument --noargs--
-  //   because pascal compiler doesn't make difference between access to a property and call of method without argument
-  if (LArgCount=1) and (LArguments[0].VType = varOleStr) and (Widestring(LArguments[0].VSTRING)=NOARGS) then
-      begin
-          LArgCount:=0;
-          SetLength(LArguments,0);
-          docall:=True;
-     end
-  else
-      docall :=False;
 
   // What type of invoke is this?
   case CallDesc^.CallType of
@@ -1545,10 +1509,8 @@ begin
       // property get or function with 0 argument
       else if LArgCount = 0 then
       begin
-        //hack Tranquil IT ... first DoFunction then GetProperty if '--noargs--' is passed as first parameter
-        if not (docall and DoFunction(Dest^, Source, string(LIdent), LArguments)) and
-          not GetProperty(Dest^, Source, string(LIdent))
-          and not DoFunction(Dest^, Source, string(LIdent), LArguments) then
+        if not GetProperty(Dest^, Source, string(LIdent)) and
+           not DoFunction(Dest^, Source, string(LIdent), LArguments) then
           RaiseDispError;
       end
 
@@ -1616,11 +1578,7 @@ begin
       // So: myList[0] won't work, but myObj.MyList[0] will!!!
       if PySequence_Check(_prop) <> 0 then
       begin
-        {$ifdef VER_30}
         _result := PySequence_GetItem(_prop, Variant(AArg));
-        {$else}
-        _result := PySequence_GetItem(_prop, AArg.vint64);
-        {$endif}
         CheckError;
       end; // of if
     end; // of if
@@ -1726,7 +1684,7 @@ function TPythonVariantType.EvalPython(const V: TVarData;
             Py_XDecRef(_value);
           end; // of try
         CheckError;
-        Result := PyInt_FromLong(_result);
+        Result := PyLong_FromLong(_result);
       finally
         Py_XDecRef(_key);
       end; // of try
@@ -1798,7 +1756,7 @@ function TPythonVariantType.EvalPython(const V: TVarData;
       try
         _result := PySequence_SetSlice( AObject, _start, _end, _value);
         CheckError;
-        Result := PyInt_FromLong(_result);
+        Result := PyLong_FromLong(_result);
       finally
         Py_XDecRef(_value);
       end; // of try
@@ -1815,7 +1773,7 @@ function TPythonVariantType.EvalPython(const V: TVarData;
       ExtractSliceIndexes(AObject, AStart, AEnd, _start, _end);
       _result := PySequence_DelSlice( AObject, _start, _end);
       CheckError;
-      Result := PyInt_FromLong(_result);
+      Result := PyLong_FromLong(_result);
     end; // of with
   end; // of function
 
@@ -1833,7 +1791,7 @@ function TPythonVariantType.EvalPython(const V: TVarData;
       try
         _result := PySequence_Contains( AObject, _value );
         CheckError;
-        Result := PyInt_FromLong(_result);
+        Result := PyLong_FromLong(_result);
       finally
         Py_XDecRef(_value);
       end; // of try
@@ -1890,7 +1848,7 @@ begin
           else if (Length(Arguments) = 1) and SameText(string(AName), 'Contains') then
             Result := SequenceContains(_container, Arguments[0])
           else if SameText(string(AName), 'Length') then
-            Result := PyInt_FromLong( GetObjectLength(_container) );
+            Result := PyLong_FromLong( GetObjectLength(_container) );
         end; // of if
       finally
         // if the key did not exist, Python generated an exception that we must propagate through CheckError
@@ -2004,7 +1962,7 @@ begin
           _len := PyObject_Length(TPythonVarData(V).VPython.PyObject);
           CheckError;
           // convert the length into a Python integer
-          _prop := PyInt_FromLong( _len );
+          _prop := PyLong_FromLong( _len );
         end; // of if
       end;
     end; // of if
@@ -2131,26 +2089,6 @@ end;
 
 //------------------------------------------------------------------------------
 { TPythonData }
-
-function TPythonData.Compare(const Right: TPythonData): Integer;
-begin
-  with GetPythonEngine do
-  begin
-    if IsPython3000 then begin
-      // not used but anyway
-      if Self.LessThan(Right) then
-        Result := -1
-      else if Self.Equal(Right) then
-        Result := 0
-      else
-        Result := 1;
-      PyErr_Clear;
-    end else begin
-      Result := PyObject_Compare(PyObject, Right.PyObject);
-      CheckError;
-    end;
-  end; // of with
-end;
 
 constructor TPythonData.Create(AObject: PPyObject);
 begin
@@ -2379,20 +2317,14 @@ function TPythonData.Equal(const Right: TPythonData): Boolean;
 begin
   with GetPythonEngine do
   begin
-    if IsPython3000 then
-      Result := PyObject_RichCompareBool(PyObject, Right.PyObject, Py_EQ) = 1
-    else
-      Result := PyObject_Compare(PyObject, Right.PyObject) = 0;
+    Result := PyObject_RichCompareBool(PyObject, Right.PyObject, Py_EQ) = 1;
     CheckError;
   end; // of with
 end;
 
 function TPythonData.GetAsAnsiString: AnsiString;
 begin
-  if Assigned(PyObject) and GetPythonEngine.PyString_CheckExact(PyObject) then
-    Result := GetPythonEngine.PyString_AsString(PyObject)
-  else
-    Result := AnsiString(GetAsString);
+  Result := AnsiString(GetAsString);
 end;
 
 function TPythonData.GetAsString: string;
@@ -2414,7 +2346,7 @@ end;
 function TPythonData.GetAsWideString: UnicodeString;
 begin
   if Assigned(PyObject) and GetPythonEngine.PyUnicode_Check(PyObject) then
-    Result := GetPythonEngine.PyUnicode_AsWideString(PyObject)
+    Result := GetPythonEngine.PyUnicodeAsString(PyObject)
   else
     Result := UnicodeString(GetAsString);
 end;
@@ -2422,23 +2354,13 @@ end;
 function TPythonData.GreaterOrEqualThan(const Right: TPythonData): Boolean;
 begin
   with GetPythonEngine do
-  begin
-    if IsPython3000 then
-      Result := PyObject_RichCompareBool(PyObject, Right.PyObject, Py_GE) = 1
-    else
-      Result := Self.Compare(Right) >= 0;
-  end;
+    Result := PyObject_RichCompareBool(PyObject, Right.PyObject, Py_GE) = 1
 end;
 
 function TPythonData.GreaterThan(const Right: TPythonData): Boolean;
 begin
   with GetPythonEngine do
-  begin
-    if IsPython3000 then
-      Result := PyObject_RichCompareBool(PyObject, Right.PyObject, Py_GT) = 1
-    else
-      Result := Self.Compare(Right) > 0;
-  end;
+    Result := PyObject_RichCompareBool(PyObject, Right.PyObject, Py_GT) = 1
 end;
 
 function TPythonData.IsNone: Boolean;
@@ -2449,23 +2371,13 @@ end;
 function TPythonData.LessOrEqualThan(const Right: TPythonData): Boolean;
 begin
   with GetPythonEngine do
-  begin
-    if IsPython3000 then
-      Result := PyObject_RichCompareBool(PyObject, Right.PyObject, Py_LE) = 1
-    else
-      Result := Self.Compare(Right) <= 0;
-  end;
+    Result := PyObject_RichCompareBool(PyObject, Right.PyObject, Py_LE) = 1
 end;
 
 function TPythonData.LessThan(const Right: TPythonData): Boolean;
 begin
   with GetPythonEngine do
-  begin
-    if IsPython3000 then
-      Result := PyObject_RichCompareBool(PyObject, Right.PyObject, Py_LT) = 1
-    else
-      Result := Self.Compare(Right) < 0;
-  end;
+    Result := PyObject_RichCompareBool(PyObject, Right.PyObject, Py_LT) = 1
 end;
 
 procedure TPythonData.SetPyObject(const Value: PPyObject);
@@ -2527,3 +2439,4 @@ initialization
 finalization
   FreeAndNil(PythonVariantType);
 end.
+

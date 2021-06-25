@@ -8,8 +8,7 @@ unit P4DLaz;
 interface
 
 uses
-  PythonEngine, PythonGUIInputOutput, MethodCallBack, VarPyth, WrapDelphi, 
-  WrapDelphiButtons, WrapDelphiClasses, WrapDelphiControls, WrapDelphiTypes, 
+  PythonEngine, PythonGUIInputOutput, MethodCallBack, VarPyth, 
   P4DLaz_register, LazarusPackageIntf;
 
 implementation
@@ -18,7 +17,6 @@ procedure Register;
 begin
   RegisterUnit('PythonEngine', @PythonEngine.Register);
   RegisterUnit('PythonGUIInputOutput', @PythonGUIInputOutput.Register);
-  RegisterUnit('WrapDelphi', @WrapDelphi.Register);
 end;
 
 initialization

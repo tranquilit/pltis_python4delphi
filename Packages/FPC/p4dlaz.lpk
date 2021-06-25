@@ -25,7 +25,7 @@
         </Debugging>
       </Linking>
     </CompilerOptions>
-    <Files Count="10">
+    <Files Count="5">
       <Item1>
         <Filename Value="..\..\Source\PythonEngine.pas"/>
         <HasRegisterProc Value="True"/>
@@ -45,30 +45,9 @@
         <UnitName Value="VarPyth"/>
       </Item4>
       <Item5>
-        <Filename Value="..\..\Source\WrapDelphi.pas"/>
-        <HasRegisterProc Value="True"/>
-        <UnitName Value="WrapDelphi"/>
-      </Item5>
-      <Item6>
-        <Filename Value="..\..\Source\WrapDelphiButtons.pas"/>
-        <UnitName Value="WrapDelphiButtons"/>
-      </Item6>
-      <Item7>
-        <Filename Value="..\..\Source\WrapDelphiClasses.pas"/>
-        <UnitName Value="WrapDelphiClasses"/>
-      </Item7>
-      <Item8>
-        <Filename Value="..\..\Source\WrapDelphiControls.pas"/>
-        <UnitName Value="WrapDelphiControls"/>
-      </Item8>
-      <Item9>
-        <Filename Value="..\..\Source\WrapDelphiTypes.pas"/>
-        <UnitName Value="WrapDelphiTypes"/>
-      </Item9>
-      <Item10>
         <Filename Value="p4dlaz_register.pas"/>
         <UnitName Value="P4DLaz_register"/>
-      </Item10>
+      </Item5>
     </Files>
     <RequiredPkgs Count="2">
       <Item1>
