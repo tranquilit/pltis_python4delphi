@@ -5715,12 +5715,16 @@ procedure TPythonEngine.CheckError(ACatchStopEx : Boolean = False);
   var
     errtype, errvalue, errtraceback: PPyObject;
     SErrValue: string;
+    NewE: EPySystemExit;
   begin
     PyErr_Fetch(errtype, errvalue, errtraceback);
     Traceback.Refresh(errtraceback);
     SErrValue := PyObjectAsString(errvalue);
     PyErr_Clear;
-    raise EPySystemExit.CreateResFmt(@SPyExcSystemError, [SErrValue]);
+    // patched PythonEngine to get the exitcode into EValue
+    NewE := EPySystemExit.CreateResFmt(@SPyExcSystemError, [SErrValue]);
+    NewE.EValue := SErrValue;
+    raise NewE;
   end;
 
 var
