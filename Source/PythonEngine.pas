@@ -4315,24 +4315,25 @@ begin
   // we build a string list of the arguments, because ParamStr returns a volatile string
   // and we want to build an array of PAnsiChar, pointing to valid strings.
   argc := ParamCount;
-  SetLength(wargv, argc + 1);
+  SetLength(wargv, argc);
   // build the PWideChar array
+  // We skip ParamStr(0)
   {$IFDEF POSIX}
   // Note that Linux uses UCS4 strings, whereas it declares using UCS2 strings!!!
-  SetLength(UCS4L, argc+1);
-  for i := 0 to argc do begin
-    UCS4L[i] := WideStringToUCS4String(ParamStr(i));
+  SetLength(UCS4L, argc);
+  for i := 0 to argc-1 do begin
+    UCS4L[i] := WideStringToUCS4String(ParamStr(i+1));
     wargv[i] := @UCS4L[i][0];
   end;
   {$ELSE}
-  SetLength(WL, argc+1);
-  for i := 0 to argc do begin
-    WL[i] := UnicodeString(ParamStr(i));
+  SetLength(WL, argc);
+  for i := 0 to argc-1 do begin
+    WL[i] := UnicodeString(ParamStr(i+1));
     wargv[i] := PWideChar(WL[i]);
   end;
   {$ENDIF}
   // set the argv list of the sys module with the application arguments
-  PySys_SetArgv( argc + 1, PPWideChar(wargv) );
+  PySys_SetArgv( argc, PPWideChar(wargv) );
 end;
 
 procedure TPythonEngine.InitWinConsole;
