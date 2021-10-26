@@ -1425,6 +1425,7 @@ type
     PyBytes_AsString:    function( ob: PPyObject): PAnsiChar; cdecl;
     PyBytes_AsStringAndSize: function( ob: PPyObject; var buffer: PAnsiChar; var size: NativeInt): integer; cdecl;
     PySys_SetArgv:        procedure( argc: Integer; argv: PPWideChar); cdecl;
+    PySys_SetArgvEx:        procedure( argc: Integer; argv: PPWideChar; updatepath: NativeInt); cdecl;
 
     PyCFunction_NewEx: function(md:PPyMethodDef;self, ob:PPyObject):PPyObject; cdecl;
 // Removed.  Use PyEval_CallObjectWithKeywords with third argument nil
@@ -1790,7 +1791,7 @@ type
     FPyDateTime_DateTimeTZType:  PPyObject;
 
   protected
-    procedure  Initialize;
+    procedure Initialize;
     procedure  Finalize;
     procedure AfterLoad; override;
     procedure BeforeLoad; override;
@@ -1812,6 +1813,7 @@ type
     procedure AssignPyFlags;
 
   public
+    InitSysArgv: Boolean;
     // Constructors & Destructors
     constructor Create(AOwner: TComponent); override;
     destructor  Destroy; override;
@@ -3354,6 +3356,7 @@ begin
   PyRun_SimpleString        := Import('PyRun_SimpleString');
   PyDict_GetItemString      := Import('PyDict_GetItemString');
   PySys_SetArgv             := Import('PySys_SetArgv');
+  PySys_SetArgvEx           := Import('PySys_SetArgvEx');
   Py_Exit                   := Import('Py_Exit');
 
   PyCFunction_NewEx           := Import('PyCFunction_NewEx');
@@ -3956,6 +3959,7 @@ var
   i : Integer;
 begin
   inherited;
+  InitSysArgv:=True;
   FInitScript              := TstringList.Create;
   FClients                 := TList.Create;
   FRedirectIO              := True;
@@ -4186,7 +4190,8 @@ begin
     FInitialized := True;
   FIORedirected := False;
   InitSysPath;
-  SetProgramArgs;
+  if InitSysArgv then
+    SetProgramArgs;
   GetTimeStructType;
   GetDateTimeTypes;
   if InitThreads and Assigned(PyEval_InitThreads) then
@@ -4315,25 +4320,24 @@ begin
   // we build a string list of the arguments, because ParamStr returns a volatile string
   // and we want to build an array of PAnsiChar, pointing to valid strings.
   argc := ParamCount;
-  SetLength(wargv, argc);
+  SetLength(wargv, argc + 1);
   // build the PWideChar array
-  // We skip ParamStr(0)
   {$IFDEF POSIX}
   // Note that Linux uses UCS4 strings, whereas it declares using UCS2 strings!!!
-  SetLength(UCS4L, argc);
-  for i := 0 to argc-1 do begin
-    UCS4L[i] := WideStringToUCS4String(ParamStr(i+1));
+  SetLength(UCS4L, argc+1);
+  for i := 0 to argc do begin
+    UCS4L[i] := WideStringToUCS4String(ParamStr(i));
     wargv[i] := @UCS4L[i][0];
   end;
   {$ELSE}
-  SetLength(WL, argc);
-  for i := 0 to argc-1 do begin
-    WL[i] := UnicodeString(ParamStr(i+1));
+  SetLength(WL, argc+1);
+  for i := 0 to argc do begin
+    WL[i] := UnicodeString(ParamStr(i));
     wargv[i] := PWideChar(WL[i]);
   end;
   {$ENDIF}
   // set the argv list of the sys module with the application arguments
-  PySys_SetArgv( argc, PPWideChar(wargv) );
+  PySys_SetArgvEx( argc + 1, PPWideChar(wargv), 0 );
 end;
 
 procedure TPythonEngine.InitWinConsole;
