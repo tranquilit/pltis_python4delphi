@@ -1278,6 +1278,11 @@ type
     Py_FrozenFlag: PInt;
     Py_IgnoreEnvironmentFlag: PInt;
 
+    // patch Tranquilit
+    Py_NoUserSiteDirectory: PInt;
+    Py_UnbufferedStdioFlag: PInt;
+    Py_IsolatedFlag: PInt;
+
     PyImport_FrozenModules: PP_frozen;
 
     Py_None:            PPyObject;
@@ -1725,9 +1730,8 @@ type
   TPathInitializationEvent = procedure ( Sender : TObject; var Path : String ) of Object;
   TSysPathInitEvent = procedure ( Sender : TObject; PathList : PPyObject ) of Object;
   TPythonFlag = (pfDebug, pfInteractive, pfNoSite, pfOptimize, pfVerbose,
-                 pfFrozenFlag, pfIgnoreEnvironmentFlag);
+                 pfFrozenFlag, pfIgnoreEnvironmentFlag, pfNoUserSiteDirectory, pfUnbufferedStdioFlag, pfIsolatedFlag);
   TPythonFlags = set of TPythonFlag;
-
 
   TTracebackItem = class
   public
@@ -3218,6 +3222,11 @@ begin
 
   Py_IgnoreEnvironmentFlag   := Import('Py_IgnoreEnvironmentFlag');
 
+  // Hack TRanquilIT
+  Py_NoUserSiteDirectory := Import('Py_NoUserSiteDirectory');
+  Py_UnbufferedStdioFlag := Import('Py_UnbufferedStdioFlag');
+  Py_IsolatedFlag := Import('Py_IsolatedFlag');
+
   Py_None                    := Import('_Py_NoneStruct');
   Py_Ellipsis                := Import('_Py_EllipsisObject');
   Py_False                   := Import('_Py_FalseStruct');
@@ -4106,6 +4115,9 @@ begin
   SetFlag(Py_NoSiteFlag,      pfNoSite in FPyFlags);
   SetFlag(Py_FrozenFlag,      pfFrozenFlag in FPyFlags);
   SetFlag(Py_IgnoreEnvironmentFlag, pfIgnoreEnvironmentFlag in FPyFlags);
+  SetFlag(Py_NoUserSiteDirectory, pfNoUserSiteDirectory in FPyFlags);
+  SetFlag(Py_UnbufferedStdioFlag, pfUnbufferedStdioFlag in FPyFlags);
+  SetFlag(Py_IsolatedFlag, pfIsolatedFlag in FPyFlags);
 end;
 
 procedure TPythonEngine.Initialize;
