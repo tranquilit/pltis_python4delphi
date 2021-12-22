@@ -10,6 +10,10 @@
 
 unit PythonVersions;
 
+{$mode delphi}
+{$modeswitch typehelpers}
+{$modeSwitch advancedRecords}
+
 interface
 Uses
   Classes;
@@ -124,7 +128,7 @@ begin
     TPythonEngine(PythonEngine).DllPath := DLLPath;
     TPythonEngine(PythonEngine).APIVersion := ApiVersion;
     if Is_venv then begin
-      TPythonEngine(PythonEngine).VenvPythonExe := PythonExecutable;
+      //TPythonEngine(PythonEngine).VenvPythonExe := PythonExecutable;
       TPythonEngine(PythonEngine).SetPythonHome(DLLPath);
     end else if not IsRegistered or Is_conda then
       {
@@ -277,8 +281,7 @@ var
   BinaryType: DWORD;
 begin
   Result := FileExists(EXEName) and
-    GetBinaryType(PChar(ExeName), Binarytype) and
-      (BinaryType = SCS_64BIT_BINARY);
+    GetBinaryType(PChar(ExeName), Binarytype);// and(BinaryType = SCS_64BIT_BINARY);
 end;
 
 function Isx64(const FileName: string): Boolean;
@@ -438,7 +441,7 @@ function PythonVersionFromPath(const Path: string; out PythonVersion: TPythonVer
     DLLFileName: string;
   begin
     Result := '';
-    Handle := FindFirstFile(PWideChar(APath+'\python??.dll'), FindFileData);
+    Handle := FindFirstFile(PChar(APath+'\python??.dll'), FindFileData);
     if Handle = INVALID_HANDLE_VALUE then Exit;  // not python dll
     DLLFileName:= FindFileData.cFileName;
     // skip if python3.dll was found
@@ -506,7 +509,7 @@ begin
   end;
   PythonVersion.DLLPath := DLLPath;
 
-  SysVersion := GetPythonVersionFromDLLName(DLLFileName);
+  //SysVersion := GetPythonVersionFromDLLName(DLLFileName);
 
   PythonVersion.SysVersion := SysVersion;
   PythonVersion.fSysArchitecture := PythonVersion.ExpectedArchitecture;
