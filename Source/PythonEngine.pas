@@ -5106,7 +5106,10 @@ begin
     varString:
       begin
         s := AnsiString(DeRefV);
-        Result := PyBytes_FromStringAndSize(PAnsiChar(s), Length(s));
+        if StrLen(pointer(s)) = Length(s) then
+          Result := PyUnicodeFromString(s)
+        else
+          Result := PyBytes_FromStringAndSize(PAnsiChar(s), Length(s));
       end;
     varUString:
       begin
