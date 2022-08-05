@@ -96,6 +96,9 @@ uses
   Posix.SysMMan,
   {$ENDIF}
   {$ENDIF WINDOWS}
+  {$ifndef WINDOWS}
+  BaseUnix,
+  {$endif}
   Classes;
 
 type
@@ -127,25 +130,6 @@ type
   PtrCalcType = NativeInt;
 {$ENDIF}
 
-{$IFNDEF MSWINDOWS}
-{$IFDEF FPC}
-function mmap(Addr: Pointer; Len: Integer; Prot: Integer; Flags: Integer; FileDes: Integer; Off: Integer): Pointer; cdecl;
-  external 'c' name 'mmap';
-
-function mprotect(Addr: Pointer; Len: Integer; Prot: Integer): Integer; cdecl;
-  external 'c' name 'mprotect';
-
-function munmap(Addr: Pointer; Len: Integer): Integer; cdecl;
-  external 'c' name 'munmap';
-const  
-  PROT_NONE   =0;
-  PROT_READ   =1;
-  PROT_WRITE  =2;
-  PROT_EXEC   =4;
-  MAP_PRIVATE =2;
-  MAP_ANON=$1000;  
-{$ENDIF}
-{$ENDIF}
 
 procedure GetCodeMem(var ptr: PByte; size: integer);
 var
@@ -167,14 +151,14 @@ begin
 	{$ELSE}
     //page := GetMem(PageSize);
     {$WARN SYMBOL_PLATFORM OFF}
-    page := mmap(Pointer($10000000), PageSize, PROT_NONE, MAP_PRIVATE or MAP_ANON, -1, 0);
+    page := fpmmap(nil, PageSize, PROT_NONE, MAP_PRIVATE or MAP_ANON, -1, 0);
     {$WARN SYMBOL_PLATFORM ON}
     if page=Pointer(-1) then //MMAP_FAILED result?
     begin
       ptr := nil;
       exit;
     end;
-    mprotect(page, PageSize, PROT_READ or PROT_WRITE or PROT_EXEC);
+    fpmprotect(page, PageSize, PROT_READ or PROT_WRITE or PROT_EXEC);
 	{$ENDIF}
     page^.next:=CodeMemPages;
     CodeMemPages:=page;
@@ -229,7 +213,7 @@ begin
           VirtualFree(page, 0, MEM_RELEASE);
 		  {$ELSE}
           // FreeMem(page);
-          munmap(page,PageSize);
+          fpmunmap(page,PageSize);
 		  {$ENDIF}
         end;
 
@@ -585,7 +569,7 @@ begin
     VirtualFree(page, 0, MEM_RELEASE);
   {$ELSE}
 	//FreeMem(page);
-    munmap(page,PageSize);
+    fpmunmap(page,PageSize);
   {$ENDIF}		  
 
     page := nextpage;

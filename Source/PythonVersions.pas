@@ -138,7 +138,7 @@ begin
          you need to add Format('%s;%0:s\Library\bin;', [Version.InstallPath]
          to your Windows path if it is not there already.
       }
-      TPythonEngine(PythonEngine).SetPythonHome(InstallPath);
+      //TPythonEngine(PythonEngine).SetPythonHome(InstallPath);
   end;
 end;
 
@@ -454,7 +454,7 @@ function PythonVersionFromPath(const Path: string; out PythonVersion: TPythonVer
       Exit;
     FindClose(FindFileData);
     DLLFileName:= FindFileData.Name;
-    if Length(DLLFileName) = {$ifdef WINDOWS}12{$else}14{$endif} then
+    if Length(DLLFileName) = {$ifdef WINDOWS}12{$else}15{$endif} then
       Result := DLLFileName;
   end;
 
