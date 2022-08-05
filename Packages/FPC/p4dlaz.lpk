@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
-  <Package Version="4">
+  <Package Version="5">
     <PathDelim Value="\"/>
     <Name Value="P4DLaz"/>
     <Type Value="RunAndDesignTime"/>
@@ -25,7 +25,7 @@
         </Debugging>
       </Linking>
     </CompilerOptions>
-    <Files Count="5">
+    <Files Count="6">
       <Item1>
         <Filename Value="..\..\Source\PythonEngine.pas"/>
         <HasRegisterProc Value="True"/>
@@ -48,7 +48,12 @@
         <Filename Value="p4dlaz_register.pas"/>
         <UnitName Value="P4DLaz_register"/>
       </Item5>
+      <Item6>
+        <Filename Value="..\..\Source\PythonVersions.pas"/>
+        <UnitName Value="PythonVersions"/>
+      </Item6>
     </Files>
+    <CompatibilityMode Value="True"/>
     <RequiredPkgs Count="2">
       <Item1>
         <PackageName Value="LCL"/>

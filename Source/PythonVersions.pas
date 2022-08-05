@@ -76,9 +76,9 @@ type
   function GetRegisteredPythonVersions : TPythonVersions;
   (* Returns the highest numbered registered Python version *)
   function GetLatestRegisteredPythonVersion(out PythonVersion: TPythonVersion): Boolean;
+  {$ENDIF}
   function PythonVersionFromPath(const Path: string; out PythonVersion: TPythonVersion;
      AcceptVirtualEnvs: Boolean = True): Boolean;
-  {$ENDIF}
 
 implementation
 
@@ -138,7 +138,7 @@ begin
          you need to add Format('%s;%0:s\Library\bin;', [Version.InstallPath]
          to your Windows path if it is not there already.
       }
-      TPythonEngine(PythonEngine).SetPythonHome(InstallPath);
+      //TPythonEngine(PythonEngine).SetPythonHome(InstallPath);
   end;
 end;
 
@@ -281,7 +281,8 @@ var
   BinaryType: DWORD;
 begin
   Result := FileExists(EXEName) and
-    GetBinaryType(PChar(ExeName), Binarytype);// and(BinaryType = SCS_64BIT_BINARY);
+    GetBinaryType(PChar(ExeName), Binarytype) and
+      (BinaryType <> SCS_32BIT_BINARY);
 end;
 
 function Isx64(const FileName: string): Boolean;
@@ -430,26 +431,30 @@ begin
     if Result then break;
   end;
 end;
+{$ENDIF}
 
 function PythonVersionFromPath(const Path: string; out PythonVersion: TPythonVersion;
   AcceptVirtualEnvs: Boolean = True): Boolean;
 
   function FindPythonDLL(APath : string): string;
   Var
-    FindFileData: TWIN32FindData;
-    Handle : THandle;
+    FindFileData: TRawbyteSearchRec;
+    res : LongInt;
     DLLFileName: string;
   begin
     Result := '';
-    Handle := FindFirstFile(PChar(APath+'\python??.dll'), FindFileData);
-    if Handle = INVALID_HANDLE_VALUE then Exit;  // not python dll
-    DLLFileName:= FindFileData.cFileName;
-    // skip if python3.dll was found
-    if Length(DLLFileName) <> 12 then FindNextFile(Handle, FindFileData);
-    if Handle = INVALID_HANDLE_VALUE then Exit;
-    Windows.FindClose(Handle);
-    DLLFileName:= FindFileData.cFileName;
-    if Length(DLLFileName) = 12 then
+    res := FindFirst(APath + DirectorySeparator + {$ifdef WINDOWS}'python**.dll' {$else}'libpython**.so'{$endif}, faAnyFile, FindFileData);
+    if res <> 0 then
+      Exit;  // not python dll/so
+    DLLFileName:= FindFileData.Name;
+    // skip if python3.dll/libpython3.so was found
+    if DLLFileName = {$ifdef WINDOWS}'python3.dll' {$else}'libpython3.so'{$endif} then
+      res := FindNext(FindFileData);
+    if res <> 0 then
+      Exit;
+    FindClose(FindFileData);
+    DLLFileName:= FindFileData.Name;
+    if Length(DLLFileName) = {$ifdef WINDOWS}12{$else}15{$endif} then
       Result := DLLFileName;
   end;
 
@@ -501,15 +506,17 @@ begin
     Exit;
   end;
 
+  {$ifdef WINDOWS}
   // check if same platform
   try
     if {$IFDEF CPUX64}not {$ENDIF}IsEXEx64(DLLPath+'\python.exe') then Exit;
   except
     Exit;
   end;
+  {$endif}
   PythonVersion.DLLPath := DLLPath;
 
-  //SysVersion := GetPythonVersionFromDLLName(DLLFileName);
+  SysVersion := SysVersionFromDLLName(DLLFileName);
 
   PythonVersion.SysVersion := SysVersion;
   PythonVersion.fSysArchitecture := PythonVersion.ExpectedArchitecture;
@@ -521,6 +528,5 @@ begin
     end;
 end;
 
-{$ENDIF}
 
 end.

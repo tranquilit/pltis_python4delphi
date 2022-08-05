@@ -592,7 +592,10 @@ end;
 
 function VarIsTrue(const AValue : Variant): Boolean;
 begin
-  Result := AValue; // the cast into a boolean will call the PyObject_IsTrue API.
+  if VarIsPython(AValue) then
+    Result := GetPythonEngine.PyObject_IsTrue( TPythonVarData(AValue).VPython.PyObject ) = 1
+  else
+    Result := AValue;
 end;
 
 function VarModuleHasObject(const AModule : Variant; aObj: AnsiString): Boolean;
@@ -855,7 +858,7 @@ begin
       varString:
         // Preserve AnsiStrings
         {$IFDEF FPC}
-        Variant(Dest) := TPythonVarData(Source).VPython.AsWideString;
+        Variant(Dest) := TPythonVarData(Source).VPython.AsString;
         {$ELSE}
         VarDataFromLStr(Dest, TPythonVarData(Source).VPython.AsAnsiString);
         {$ENDIF}

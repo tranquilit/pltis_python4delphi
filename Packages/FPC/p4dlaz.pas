@@ -9,7 +9,7 @@ interface
 
 uses
   PythonEngine, PythonGUIInputOutput, MethodCallBack, VarPyth, 
-  P4DLaz_register, LazarusPackageIntf;
+  P4DLaz_register, PythonVersions, LazarusPackageIntf;
 
 implementation
 
