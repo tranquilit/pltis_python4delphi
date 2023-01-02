@@ -20,11 +20,14 @@ Uses
 
 type
 
+  { TPythonVersion }
+
   TPythonVersion = record
   private
     FDisplayName: string;
     FHelpFile: string;
     fSysArchitecture : string;
+    fPythonExecutable: String;
     function GetDLLName: string;
     function ExpectedArchitecture:string;
     function GetIsPython3K: Boolean;
@@ -44,8 +47,9 @@ type
     function Is_venv: Boolean;
     function Is_virtualenv: Boolean;
     function Is_conda: Boolean;
+    function HasCustomExecutable: Boolean;
     procedure AssignTo(PythonEngine: TPersistent);
-    property PythonExecutable: string read GetPythonExecutable;
+    property PythonExecutable: string read GetPythonExecutable write fPythonExecutable;
     property DLLName: string read GetDLLName;
     property SysArchitecture: string read GetSysArchitecture;
     property IsPython3K: Boolean read GetIsPython3K;
@@ -199,10 +203,15 @@ end;
 
 function TPythonVersion.GetPythonExecutable: string;
 begin
-  Result := IncludeTrailingPathDelimiter(InstallPath) + 'python.exe';
-  if not FileExists(Result) then begin
-    Result := IncludeTrailingPathDelimiter(InstallPath) +  'Scripts' + PathDelim + 'python.exe';
-    if not FileExists(Result) then Result := '';
+  if fPythonExecutable <> '' then
+    Result := fPythonExecutable
+  else
+  begin
+    Result := IncludeTrailingPathDelimiter(InstallPath) + 'python.exe';
+    if not FileExists(Result) then begin
+      Result := IncludeTrailingPathDelimiter(InstallPath) +  'Scripts' + PathDelim + 'python.exe';
+      if not FileExists(Result) then Result := '';
+    end;
   end;
 end;
 
@@ -216,6 +225,11 @@ end;
 function TPythonVersion.Is_conda: Boolean;
 begin
   Result := DirectoryExists(IncludeTrailingPathDelimiter(InstallPath) + 'conda-meta');
+end;
+
+function TPythonVersion.HasCustomExecutable: Boolean;
+begin
+  Result := fPythonExecutable <> '';
 end;
 
 function TPythonVersion.Is_venv: Boolean;
