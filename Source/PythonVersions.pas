@@ -102,7 +102,11 @@ begin
   {$IFDEF MSWINDOWS}
   Result := 'python' + SysVersion[1] + SysVersion[3] + '.dll';
   {$ELSE}
+  {$ifdef DARWIN}
+  Result := 'libpython' + SysVersion + '.dylib';
+  {$else}
   Result := 'libpython' + SysVersion + '.so';
+  {$endif}
   {$ENDIF}
 end;
 
@@ -457,18 +461,18 @@ function PythonVersionFromPath(const Path: string; out PythonVersion: TPythonVer
     DLLFileName: string;
   begin
     Result := '';
-    res := FindFirst(APath + DirectorySeparator + {$ifdef WINDOWS}'python**.dll' {$else}'libpython**.so'{$endif}, faAnyFile, FindFileData);
+    res := FindFirst(APath + DirectorySeparator + {$ifdef WINDOWS}'python**.dll' {$else}{$ifdef DARWIN}'libpython**.dylib'{$else}'libpython**.so'{$endif}{$endif}, faAnyFile, FindFileData);
     if res <> 0 then
-      Exit;  // not python dll/so
+      Exit;  // not python dll/dylib/so
     DLLFileName:= FindFileData.Name;
-    // skip if python3.dll/libpython3.so was found
-    if DLLFileName = {$ifdef WINDOWS}'python3.dll' {$else}'libpython3.so'{$endif} then
+    // skip if python3.dll/libpython3.dylib/libpython3.so was found
+    if DLLFileName = {$ifdef WINDOWS}'python3.dll' {$else}{$ifdef DARWIN}'libpython3.dylib'{$else}'libpython3.so'{$endif}{$endif} then
       res := FindNext(FindFileData);
     if res <> 0 then
       Exit;
     FindClose(FindFileData);
     DLLFileName:= FindFileData.Name;
-    if Length(DLLFileName) = {$ifdef WINDOWS}12{$else}15{$endif} then
+    if Length(DLLFileName) = {$ifdef WINDOWS}12{$else}{$ifdef DARWIN}18{$else}15{$endif}{$endif} then
       Result := DLLFileName;
   end;
 
