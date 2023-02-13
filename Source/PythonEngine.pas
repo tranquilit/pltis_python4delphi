@@ -2924,7 +2924,7 @@ var
   thread_id : TObject;
   i : Integer;
 begin
-  thread_id := TObject(GetCurrentThreadId);
+  thread_id := TObject(GetCurrentThreadId());
   for i := 0 to FLinesPerThread.Count-1 do
     if FLinesPerThread.Objects[i] = thread_id then
       begin
@@ -8658,7 +8658,7 @@ var
 begin
   // Forbid printing for any other thread than the main one
   {$IFNDEF FPC}
-  if GetCurrentThreadId <> MainThreadId then
+  if GetCurrentThreadId() <> MainThreadId then
     with GetPythonEngine do
       begin
         if RedirectIO and (IO <> nil) and (IO.ClassName <> 'TPythonInputOutput') and not IO.DelayWrites then
