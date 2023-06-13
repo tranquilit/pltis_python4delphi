@@ -946,6 +946,394 @@ type
   end;
   PPy_buffer=^Py_buffer;
 
+Const
+    _PyStatus_TYPE_OK = 0;
+    _PyStatus_TYPE_ERROR = 1;
+    _PyStatus_TYPE_EXIT = 2;
+
+type
+    PyStatus = {$IFNDEF CPUX64}packed{$ENDIF} record
+      _type :  Longint;
+      func : ^char;
+      err_msg : ^char;
+      exitcode : longint;
+    end;
+
+  PyWideStringList = {$IFNDEF CPUX64}packed{$ENDIF} record
+      length : Py_ssize_t;
+      items : PPWideChar;
+    end;
+
+  PPyPreConfig = ^PyPreConfig;
+  PyPreConfig={$IFNDEF CPUX64}packed{$ENDIF} record
+      _config_init: Integer;     //* _PyConfigInitEnum value */
+
+      //* Parse Py_PreInitializeFromBytesArgs() arguments?
+      //   See PyConfig.parse_argv */
+      parse_argv: Integer;
+
+      //* If greater than 0, enable isolated mode: sys.path contains
+      //   neither the script's directory nor the user's site-packages directory.
+
+      //   Set to 1 by the -I command line option. If set to -1 (default), inherit
+      //   Py_IsolatedFlag value. */
+      isolated: Integer;
+
+      //* If greater than 0: use environment variables.
+      //   Set to 0 by -E command line option. If set to -1 (default), it is
+      //   set to !Py_IgnoreEnvironmentFlag. */
+      use_environment: Integer;
+
+      //* Set the LC_CTYPE locale to the user preferred locale? If equals to 0,
+      //   set coerce_c_locale and coerce_c_locale_warn to 0. */
+      configure_locale: Integer;
+
+      //* Coerce the LC_CTYPE locale if it's equal to "C"? (PEP 538)
+
+      //   Set to 0 by PYTHONCOERCECLOCALE=0. Set to 1 by PYTHONCOERCECLOCALE=1.
+      //   Set to 2 if the user preferred LC_CTYPE locale is "C".
+
+      //   If it is equal to 1, LC_CTYPE locale is read to decide if it should be
+      //   coerced or not (ex: PYTHONCOERCECLOCALE=1). Internally, it is set to 2
+      //   if the LC_CTYPE locale must be coerced.
+
+      //   Disable by default (set to 0). Set it to -1 to let Python decide if it
+      //   should be enabled or not. */
+      coerce_c_locale: Integer;
+
+      //* Emit a warning if the LC_CTYPE locale is coerced?
+
+      //   Set to 1 by PYTHONCOERCECLOCALE=warn.
+
+      //   Disable by default (set to 0). Set it to -1 to let Python decide if it
+      //   should be enabled or not. */
+      coerce_c_locale_warn: Integer;
+
+  {$ifdef WINDOWS}
+      //* If greater than 1, use the "mbcs" encoding instead of the UTF-8
+      //   encoding for the filesystem encoding.
+
+      //   Set to 1 if the PYTHONLEGACYWINDOWSFSENCODING environment variable is
+      //   set to a non-empty string. If set to -1 (default), inherit
+      //   Py_LegacyWindowsFSEncodingFlag value.
+
+      //   See PEP 529 for more details. */
+      legacy_windows_fs_encoding: Integer;
+  {$endif}
+
+      //* Enable UTF-8 mode? (PEP 540)
+
+      //   Disabled by default (equals to 0).
+
+      //   Set to 1 by "-X utf8" and "-X utf8=1" command line options.
+      //   Set to 1 by PYTHONUTF8=1 environment variable.
+
+      //   Set to 0 by "-X utf8=0" and PYTHONUTF8=0.
+
+      //   If equals to -1, it is set to 1 if the LC_CTYPE locale is "C" or
+      //   "POSIX", otherwise it is set to 0. Inherit Py_UTF8Mode value value. */
+      utf8_mode: Integer;
+
+      dev_mode: Integer;           //* Development mode. PYTHONDEVMODE, -X dev */
+
+      //* Memory allocator: PYTHONMALLOC env var.
+      //   See PyMemAllocatorName for valid values. */
+      allocator: Integer;
+  end;
+
+  ///* --- PyConfig ---------------------------------------------- */
+  PPyConfig = ^PyConfig;
+  PyConfig = {$IFNDEF CPUX64}packed{$ENDIF} record
+      _config_init: Integer;     //* _PyConfigInitEnum value */
+
+      isolated: Integer;         //* Isolated mode? see PyPreConfig.isolated */
+      use_environment: Integer;  //* Use environment variables? see PyPreConfig.use_environment */
+      dev_mode: Integer;         //* Development mode? See PyPreConfig.dev_mode */
+
+      //* Install signal handlers? Yes by default. */
+      install_signal_handlers: Integer;
+
+      use_hash_seed: Integer;      //* PYTHONHASHSEED=x */
+      hash_seed: LongWord;
+
+      //* Enable faulthandler?
+      //   Set to 1 by -X faulthandler and PYTHONFAULTHANDLER. -1 means unset. */
+      faulthandler: Integer;
+
+      //* Enable tracemalloc?
+      //   Set by -X tracemalloc=N and PYTHONTRACEMALLOC. -1 means unset */
+      tracemalloc: Integer;
+
+      import_time: Integer;        //* PYTHONPROFILEIMPORTTIME, -X importtime */
+      show_ref_count: Integer;     //* -X showrefcount */
+      show_alloc_count: Integer;   //* -X showalloccount */
+      dump_refs: Integer;          //* PYTHONDUMPREFS */
+      malloc_stats: Integer;       //* PYTHONMALLOCSTATS */
+
+      //* Python filesystem encoding and error handler:
+      //   sys.getfilesystemencoding() and sys.getfilesystemencodeerrors().
+
+      //   Default encoding and error handler:
+      {
+         * if Py_SetStandardStreamEncoding() has been called: they have the
+           highest priority;
+         * PYTHONIOENCODING environment variable;
+         * The UTF-8 Mode uses UTF-8/surrogateescape;
+         * If Python forces the usage of the ASCII encoding (ex: C locale
+           or POSIX locale on FreeBSD or HP-UX), use ASCII/surrogateescape;
+         * locale encoding: ANSI code page on Windows, UTF-8 on Android and
+           VxWorks, LC_CTYPE locale encoding on other platforms;
+         * On Windows, "surrogateescape" error handler;
+         * "surrogateescape" error handler if the LC_CTYPE locale is "C" or "POSIX";
+         * "surrogateescape" error handler if the LC_CTYPE locale has been coerced
+           (PEP 538);
+         * "strict" error handler.
+
+         Supported error handlers: "strict", "surrogateescape" and
+         "surrogatepass". The surrogatepass error handler is only supported
+         if Py_DecodeLocale() and Py_EncodeLocale() use directly the UTF-8 codec;
+         it's only used on Windows.
+
+         initfsencoding() updates the encoding to the Python codec name.
+         For example, "ANSI_X3.4-1968" is replaced with "ascii".
+
+         On Windows, sys._enablelegacywindowsfsencoding() sets the
+         encoding/errors to mbcs/replace at runtime.
+
+
+         See Py_FileSystemDefaultEncoding and Py_FileSystemDefaultEncodeErrors.
+         */
+      }
+      filesystem_encoding: PWideChar;
+      filesystem_errors: PWideChar;
+
+      pycache_prefix: PWideChar;  //* PYTHONPYCACHEPREFIX, -X pycache_prefix=PATH */
+      parse_argv: Integer;           //* Parse argv command line arguments? */
+
+      //* Command line arguments (sys.argv).
+
+      //   Set parse_argv to 1 to parse argv as Python command line arguments
+      //   and then strip Python arguments from argv.
+
+      //   If argv is empty, an empty string is added to ensure that sys.argv
+      //   always exists and is never empty. */
+      argv: PyWideStringList;
+
+      //* Program name:
+      {
+         - If Py_SetProgramName() was called, use its value.
+         - On macOS, use PYTHONEXECUTABLE environment variable if set.
+         - If WITH_NEXT_FRAMEWORK macro is defined, use __PYVENV_LAUNCHER__
+           environment variable is set.
+         - Use argv[0] if available and non-empty.
+         - Use "python" on Windows, or "python3 on other platforms. */
+      }
+      program_name: PWideChar;
+
+      xoptions: PyWideStringList;     //* Command line -X options */
+
+      //* Warnings options: lowest to highest priority. warnings.filters
+      //   is built in the reverse order (highest to lowest priority). */
+      warnoptions: PyWideStringList;
+
+      //* If equal to zero, disable the import of the module site and the
+      //   site-dependent manipulations of sys.path that it entails. Also disable
+      //   these manipulations if site is explicitly imported later (call
+      //   site.main() if you want them to be triggered).
+
+      //   Set to 0 by the -S command line option. If set to -1 (default), it is
+      //   set to !Py_NoSiteFlag. */
+      site_import: Integer;
+
+      //* Bytes warnings:
+      {
+         * If equal to 1, issue a warning when comparing bytes or bytearray with
+           str or bytes with int.
+         * If equal or greater to 2, issue an error.
+
+         Incremented by the -b command line option. If set to -1 (default), inherit
+         Py_BytesWarningFlag value. */
+      }
+      bytes_warning: Integer;
+
+      //* If greater than 0, enable inspect: when a script is passed as first
+      {   argument or the -c option is used, enter interactive mode after
+         executing the script or the command, even when sys.stdin does not appear
+         to be a terminal.
+
+         Incremented by the -i command line option. Set to 1 if the PYTHONINSPECT
+         environment variable is non-empty. If set to -1 (default), inherit
+         Py_InspectFlag value. */
+      }
+      inspect: Integer;
+
+      //* If greater than 0: enable the interactive mode (REPL).
+      {
+         Incremented by the -i command line option. If set to -1 (default),
+         inherit Py_InteractiveFlag value. */
+      }
+      interactive: Integer;
+
+      //* Optimization level.
+      {
+         Incremented by the -O command line option. Set by the PYTHONOPTIMIZE
+         environment variable. If set to -1 (default), inherit Py_OptimizeFlag
+         value. */
+      }
+      optimization_level: Integer;
+
+      //* If greater than 0, enable the debug mode: turn on parser debugging
+      {   output (for expert only, depending on compilation options).
+
+         Incremented by the -d command line option. Set by the PYTHONDEBUG
+         environment variable. If set to -1 (default), inherit Py_DebugFlag
+         value. */
+      }
+      parser_debug: Integer;
+
+      //* If equal to 0, Python won't try to write ``.pyc`` files on the
+      {   import of source modules.
+
+         Set to 0 by the -B command line option and the PYTHONDONTWRITEBYTECODE
+         environment variable. If set to -1 (default), it is set to
+         !Py_DontWriteBytecodeFlag. */
+      }
+      write_bytecode: Integer;
+
+      //* If greater than 0, enable the verbose mode: pr: Integera message each time a
+      {   module is initialized, showing the place (filename or built-in module)
+         from which it is loaded.
+
+         If greater or equal to 2, pr: Integera message for each file that is checked
+         for when searching for a module. Also provides information on module
+         cleanup at exit.
+
+         Incremented by the -v option. Set by the PYTHONVERBOSE environment
+         variable. If set to -1 (default), inherit Py_VerboseFlag value. */
+      }
+      verbose: Integer;
+
+      //* If greater than 0, enable the quiet mode: Don't display the copyright
+      {   and version messages even in interactive mode.
+
+         Incremented by the -q option. If set to -1 (default), inherit
+         Py_QuietFlag value. */
+      }
+      quiet: Integer;
+
+     //* If greater than 0, don't add the user site-packages directory to
+     {   sys.path.
+
+        Set to 0 by the -s and -I command line options , and the PYTHONNOUSERSITE
+        environment variable. If set to -1 (default), it is set to
+        !Py_NoUserSiteDirectory. */
+      }
+      user_site_directory: Integer;
+
+      //* If non-zero, configure C standard steams (stdio, stdout,
+      {   stderr):
+
+         - Set O_BINARY mode on Windows.
+         - If buffered_stdio is equal to zero, make streams unbuffered.
+           Otherwise, enable streams buffering if interactive is non-zero. */
+      }
+      configure_c_stdio: Integer;
+
+      //* If equal to 0, enable unbuffered mode: force the stdout and stderr
+      //   streams to be unbuffered.
+
+      //   Set to 0 by the -u option. Set by the PYTHONUNBUFFERED environment
+      //   variable.
+      //   If set to -1 (default), it is set to !Py_UnbufferedStdioFlag. */
+      buffered_stdio: Integer;
+
+      //* Encoding of sys.stdin, sys.stdout and sys.stderr.
+      //   Value set from PYTHONIOENCODING environment variable and
+      //   Py_SetStandardStreamEncoding() function.
+      //   See also 'stdio_errors' attribute. */
+      stdio_encoding: PWideChar;
+
+      //* Error handler of sys.stdin and sys.stdout.
+      //   Value set from PYTHONIOENCODING environment variable and
+      //   Py_SetStandardStreamEncoding() function.
+      //   See also 'stdio_encoding' attribute. */
+      stdio_errors: PWideChar;
+
+  {$ifdef WINDOWS}
+      //* If greater than zero, use io.FileIO instead of WindowsConsoleIO for sys
+      //   standard streams.
+      //
+      //   Set to 1 if the PYTHONLEGACYWINDOWSSTDIO environment variable is set to
+      //   a non-empty string. If set to -1 (default), inherit
+      //   Py_LegacyWindowsStdioFlag value.
+
+      //   See PEP 528 for more details. */
+      legacy_windows_stdio: Integer;
+  {$endif}
+
+      { Value of the --check-hash-based-pycs command line option:
+
+         - "default" means the 'check_source' flag in hash-based pycs
+           determines invalidation
+         - "always" causes the interpreter to hash the source file for
+           invalidation regardless of value of 'check_source' bit
+         - "never" causes the interpreter to always assume hash-based pycs are
+           valid
+
+         The default value is "default".
+
+         See PEP 552 "Deterministic pycs" for more details. }
+      check_hash_pycs_mode: PWideChar;
+
+      //* --- Path configuration inputs ------------ */
+
+      { If greater than 0, suppress _PyPathConfig_Calculate() warnings on Unix.
+         The parameter has no effect on Windows.
+
+         If set to -1 (default), inherit !Py_FrozenFlag value. }
+      pathconfig_warnings: Integer;
+
+      pythonpath_env: PWideChar; //* PYTHONPATH environment variable */
+      home: PWideChar;          //* PYTHONHOME environment variable,
+                                // see also Py_SetPythonHome(). */
+
+      //* --- Path configuration outputs ----------- */
+
+      module_search_paths_set: Integer;  //* If non-zero, use module_search_paths */
+      module_search_paths: PyWideStringList;  { sys.path paths. Computed if
+                                         module_search_paths_set is equal
+                                         to zero. }
+
+      executable: PWideChar;        //* sys.executable */
+      base_executable: PWideChar;   //* sys._base_executable */
+      prefix: PWideChar;            //* sys.prefix */
+      base_prefix: PWideChar;       //* sys.base_prefix */
+      exec_prefix: PWideChar;       //* sys.exec_prefix */
+      base_exec_prefix: PWideChar;  //* sys.base_exec_prefix */
+
+      //* --- Parameter only used by Py_Main() ---------- */
+
+      //* Skip the first line of the source ('run_filename' parameter), allowing use of non-Unix forms of
+      //   "#!cmd".  This is intended for a DOS specific hack only.
+      //
+      //   Set by the -x command line option. */
+      skip_source_first_line: Integer;
+
+      run_command: PWideChar;   //* -c command line argument */
+      run_module: PWideChar;    //* -m command line argument */
+      run_filename: PWideChar;  //* Trailing command line argument without -c or -m */
+
+      //* --- Private fields ---------------------------- */
+
+      { Install importlib? If set to 0, importlib is not initialized at all.
+         Needed by freeze_importlib. }
+      _install_importlib: Integer;
+
+      //* If equal to 0, stop Python initialization before the "main" phase */
+      _init_main: Integer;
+  end;
+
+
 //#######################################################
 //##                                                   ##
 //##         GIL state                                 ##
@@ -1282,6 +1670,7 @@ type
     Py_NoUserSiteDirectory: PInt;
     Py_UnbufferedStdioFlag: PInt;
     Py_IsolatedFlag: PInt;
+    Py_DontWriteBytecodeFlag: PInt;
 
     PyImport_FrozenModules: PP_frozen;
 
@@ -1403,6 +1792,7 @@ type
     PyArg_ParseTupleAndKeywords:   function( args: PPyObject; kw: PPyObject; format: PAnsiChar; kwargs: PPAnsiChar {;...}): Integer; cdecl varargs;
     Py_BuildValue:      function( format: PAnsiChar {;...}): PPyObject; cdecl varargs;
     Py_Initialize:      procedure; cdecl;
+    Py_InitializeFromConfig: function(Config: PPyConfig): PyStatus; cdecl;
     Py_Exit:            procedure( RetVal: Integer); cdecl;
     PyEval_GetBuiltins: function: PPyObject; cdecl;
     PyDict_Copy:        function(mp: PPyObject):PPyObject; cdecl;
@@ -1655,6 +2045,41 @@ type
     PyBuffer_Release                : procedure(view: PPy_buffer); cdecl;
 
 
+    PyStatus_Ok                     : function: PyStatus; cdecl;
+    PyStatus_Error                  : function(err_msg: PChar): PyStatus; cdecl;
+    PyStatus_NoMemory               : function: PyStatus; cdecl;
+    PyStatus_Exit                   : function(exitcode: integer): PyStatus; cdecl;
+    PyStatus_IsError                : function(err: PyStatus ): integer; cdecl;
+    PyStatus_IsExit                 : function(err: PyStatus ): integer; cdecl;
+    PyStatus_Exception              : function(err: PyStatus ): integer; cdecl;
+
+    PyPreConfig_InitPythonConfig    : procedure(config: PPyPreConfig); cdecl;
+    PyPreConfig_InitIsolatedConfig  : procedure(config: PPyPreConfig); cdecl;
+
+    PyConfig_InitPythonConfig       : procedure(config: PPyConfig); cdecl;
+    PyConfig_InitIsolatedConfig     : procedure(config: PPyConfig); cdecl;
+    PyConfig_Clear                  : procedure(config: PPyConfig); cdecl;
+    PyConfig_Read                   : function (config: PPyConfig): PyStatus; cdecl;
+    PyConfig_SetString              : function (config: PPyConfig; config_str: PPWideChar; str: PWideChar): PyStatus; cdecl;
+
+    {
+    PyAPI_FUNC(PyStatus) PyConfig_SetBytesString(
+        PyConfig *config,
+        wchar_t **config_str,
+        const char *str);
+    PyAPI_FUNC(PyStatus) PyConfig_SetBytesArgv(
+        PyConfig *config,
+        Py_ssize_t argc,
+        char * const *argv);
+    PyAPI_FUNC(PyStatus) PyConfig_SetArgv(PyConfig *config,
+        Py_ssize_t argc,
+        wchar_t * const *argv);
+    PyAPI_FUNC(PyStatus) PyConfig_SetWideStringList(PyConfig *config,
+        PyWideStringList *list,
+        Py_ssize_t length, wchar_t **items);
+    }
+
+
   // Not exported in Python 3.8 and implemented as functions - this has been fixed
   // TODO - deal with the following:
   // the PyParser_* functions are deprecated in python 3.9 and will be removed in
@@ -1730,7 +2155,8 @@ type
   TPathInitializationEvent = procedure ( Sender : TObject; var Path : String ) of Object;
   TSysPathInitEvent = procedure ( Sender : TObject; PathList : PPyObject ) of Object;
   TPythonFlag = (pfDebug, pfInteractive, pfNoSite, pfOptimize, pfVerbose,
-                 pfFrozenFlag, pfIgnoreEnvironmentFlag, pfNoUserSiteDirectory, pfUnbufferedStdioFlag, pfIsolatedFlag);
+                 pfFrozenFlag, pfIgnoreEnvironmentFlag, pfNoUserSiteDirectory,
+                 pfUnbufferedStdioFlag, pfIsolatedFlag, pfDontWriteBytecodeFlag);
   TPythonFlags = set of TPythonFlag;
 
   TTracebackItem = class
@@ -1774,6 +2200,7 @@ type
     FAutoFinalize:               Boolean;
     FProgramName:                UnicodeString;
     FPythonHome:                 UnicodeString;
+    FPythonPyCache:              UnicodeString;
     FInitThreads:                Boolean;
     FOnPathInitialization:       TPathInitializationEvent;
     FOnSysPathInit:              TSysPathInitEvent;
@@ -1906,6 +2333,7 @@ type
     property GlobalVars : PPyObject read FGlobalVars Write SetGlobalVars;
     property IOPythonModule: TObject read FIOPythonModule; {TPythonModule}
     property PythonHome: UnicodeString read FPythonHome write SetPythonHome;
+    property PythonPyCache: UnicodeString read FPythonPyCache write FPythonPyCache;
     property ProgramName: UnicodeString read FProgramName write SetProgramName;
   published
     property AutoFinalize: Boolean read FAutoFinalize write FAutoFinalize default True;
@@ -3226,6 +3654,7 @@ begin
   Py_NoUserSiteDirectory := Import('Py_NoUserSiteDirectory');
   Py_UnbufferedStdioFlag := Import('Py_UnbufferedStdioFlag');
   Py_IsolatedFlag := Import('Py_IsolatedFlag');
+  Py_DontWriteBytecodeFlag := Import('Py_DontWriteBytecodeFlag');
 
   Py_None                    := Import('_Py_NoneStruct');
   Py_Ellipsis                := Import('_Py_EllipsisObject');
@@ -3359,6 +3788,7 @@ begin
   PyArg_ParseTupleAndKeywords := Import('PyArg_ParseTupleAndKeywords');
   Py_BuildValue             := Import('Py_BuildValue');
   Py_Initialize             := Import('Py_Initialize');
+  Py_InitializeFromConfig   := Import('Py_InitializeFromConfig');
   PyModule_GetDict          := Import('PyModule_GetDict');
   PyObject_Str              := Import('PyObject_Str');
   PyRun_String              := Import('PyRun_String');
@@ -3591,6 +4021,21 @@ begin
   PyGILState_Ensure        := Import('PyGILState_Ensure');
   PyGILState_Release       := Import('PyGILState_Release');
   PyBuffer_Release         := Import('PyBuffer_Release');
+
+  PyStatus_Ok              := Import('PyStatus_Ok');
+  PyStatus_Error           := Import('PyStatus_Error');
+  PyStatus_NoMemory        := Import('PyStatus_NoMemory');
+  PyStatus_Exit            := Import('PyStatus_Exit');
+  PyStatus_IsError         := Import('PyStatus_IsError');
+  PyStatus_IsExit          := Import('PyStatus_IsExit');
+  PyStatus_Exception       := Import('PyStatus_Exception');
+
+  PyPreConfig_InitPythonConfig := Import('PyPreConfig_InitPythonConfig');
+  PyPreConfig_InitIsolatedConfig := Import('PyPreConfig_InitIsolatedConfig');
+  PyConfig_InitPythonConfig := Import('PyConfig_InitPythonConfig');
+  PyConfig_InitIsolatedConfig := Import('PyConfig_InitIsolatedConfig');
+  PyConfig_Clear            := Import('PyConfig_Clear');
+  PyConfig_SetString       :=  Import('PyConfig_SetString');
 end;
 
 function TPythonInterface.Py_CompileString(s1,s2:PAnsiChar;i:integer):PPyObject;
@@ -4118,6 +4563,8 @@ begin
   SetFlag(Py_NoUserSiteDirectory, pfNoUserSiteDirectory in FPyFlags);
   SetFlag(Py_UnbufferedStdioFlag, pfUnbufferedStdioFlag in FPyFlags);
   SetFlag(Py_IsolatedFlag, pfIsolatedFlag in FPyFlags);
+  SetFlag(Py_DontWriteBytecodeFlag, pfDontWriteBytecodeFlag in FPyFlags);
+
 end;
 
 procedure TPythonEngine.Initialize;
@@ -4180,44 +4627,95 @@ procedure TPythonEngine.Initialize;
 
 var
   i : Integer;
+  APreconfig: PyPreConfig;
+  AConfig: PyConfig;
+  Astatus: PyStatus ;
 begin
   if Assigned(gPythonEngine) then
     raise Exception.Create('There is already one instance of TPythonEngine running' );
 
   gPythonEngine := Self;
-  //CheckRegistry; //AT: disabled
-  if Assigned(Py_SetProgramName) then
-  begin
+  try
+
+    // Initialize default preconfig
+    //PyPreConfig_InitIsolatedConfig(@APreconfig);
+
+    AssignPyFlags;
+
+    // https://docs.python.org/3/c-api/init_config.html
+    PyConfig_InitIsolatedConfig(@AConfig);
+
+    // already set by AssignPyFlags
+    AConfig.isolated := -1;
+    AConfig.buffered_stdio := -1;
+    AConfig.user_site_directory := -1;
+    AConfig.parser_debug := -1;
+
+    if pfDontWriteBytecodeFlag in PyFlags then
+    begin
+      AConfig.check_hash_pycs_mode := 'never';
+      AConfig.write_bytecode := 0;
+    end;
+
+    if FPythonPyCache <> '' then
+      AConfig.pycache_prefix := PWideChar(FPythonPyCache);
+
+    if FPythonHome <> '' then
+      AConfig.home := PWideChar(FPythonHome);
+
     if FProgramName = '' then
-      FProgramName := UnicodeString(ParamStr(0));
-    Py_SetProgramName(PWideChar(FProgramName));
+      FProgramName := UTF8Decode(ParamStr(0));
+    if FProgramName = '' then
+      AConfig.program_name := PWideChar(FProgramName);
+
+    AStatus := Py_InitializeFromConfig(@AConfig);
+    if PyStatus_Exception(AStatus)<>0 then
+      raise Exception.Create('Unable to initialize python');
+    PyConfig_Clear(@AConfig);
+
+    //CheckRegistry; //AT: disabled
+    {
+    if Assigned(Py_SetProgramName) then
+    begin
+      if FProgramName = '' then
+        FProgramName := UnicodeString(ParamStr(0));
+      Py_SetProgramName(PWideChar(FProgramName));
+    end;
+    if FPythonHome <> '' then
+      Py_SetPythonHome(PWideChar(FPythonHome));
+    Py_Initialize;
+    }
+
+    if Assigned(Py_IsInitialized) then
+      FInitialized := Py_IsInitialized() <> 0
+    else
+      FInitialized := True;
+    FIORedirected := False;
+    InitSysPath;
+    if InitSysArgv then
+      SetProgramArgs;
+    GetTimeStructType;
+    GetDateTimeTypes;
+    if InitThreads and Assigned(PyEval_InitThreads) then
+      PyEval_InitThreads;
+    if RedirectIO and Assigned(FIO) then
+      DoRedirectIO;
+    for i := 0 to ClientCount - 1 do
+      with Clients[i] do
+        if not Initialized then
+          Initialize;
+    if InitScript.Count > 0 then
+      ExecStrings( InitScript );
+    if Assigned(FOnAfterInit) then
+      FOnAfterInit(Self);
+
+  except
+    PyConfig_Clear(@Aconfig);
+    if (PyStatus_IsExit(AStatus)=1) then
+      system.ExitCode := AStatus.exitcode
+    else
+      Raise;
   end;
-  AssignPyFlags;
-  if FPythonHome <> '' then
-    Py_SetPythonHome(PWideChar(FPythonHome));
-  Py_Initialize;
-  if Assigned(Py_IsInitialized) then
-    FInitialized := Py_IsInitialized() <> 0
-  else
-    FInitialized := True;
-  FIORedirected := False;
-  InitSysPath;
-  if InitSysArgv then
-    SetProgramArgs;
-  GetTimeStructType;
-  GetDateTimeTypes;
-  if InitThreads and Assigned(PyEval_InitThreads) then
-    PyEval_InitThreads;
-  if RedirectIO and Assigned(FIO) then
-    DoRedirectIO;
-  for i := 0 to ClientCount - 1 do
-    with Clients[i] do
-      if not Initialized then
-        Initialize;
-  if InitScript.Count > 0 then
-    ExecStrings( InitScript );
-  if Assigned(FOnAfterInit) then
-    FOnAfterInit(Self);
 end;
 
 procedure TPythonEngine.SetInitScript(Value: TStrings);
