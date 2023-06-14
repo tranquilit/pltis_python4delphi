@@ -959,6 +959,7 @@ type
       exitcode : longint;
     end;
 
+  PPyWideStringList = ^PyWideStringList;
   PyWideStringList = {$IFNDEF CPUX64}packed{$ENDIF} record
       length : Py_ssize_t;
       items : PPWideChar;
@@ -2061,24 +2062,10 @@ type
     PyConfig_Clear                  : procedure(config: PPyConfig); cdecl;
     PyConfig_Read                   : function (config: PPyConfig): PyStatus; cdecl;
     PyConfig_SetString              : function (config: PPyConfig; config_str: PPWideChar; str: PWideChar): PyStatus; cdecl;
-
-    {
-    PyAPI_FUNC(PyStatus) PyConfig_SetBytesString(
-        PyConfig *config,
-        wchar_t **config_str,
-        const char *str);
-    PyAPI_FUNC(PyStatus) PyConfig_SetBytesArgv(
-        PyConfig *config,
-        Py_ssize_t argc,
-        char * const *argv);
-    PyAPI_FUNC(PyStatus) PyConfig_SetArgv(PyConfig *config,
-        Py_ssize_t argc,
-        wchar_t * const *argv);
-    PyAPI_FUNC(PyStatus) PyConfig_SetWideStringList(PyConfig *config,
-        PyWideStringList *list,
-        Py_ssize_t length, wchar_t **items);
-    }
-
+    PyConfig_SetBytesString         : function (config: PPyConfig; config_str: PPWideChar; str: PChar): PyStatus; cdecl;
+    PyConfig_SetBytesArgv           : function (config: PPyConfig; argc: Py_ssize_t; argv: PChar): PyStatus; cdecl;
+    PyConfig_SetArgv                : function (config: PPyConfig; argc: Py_ssize_t; argv: PWideChar): PyStatus; cdecl;
+    PyConfig_SetWideStringList      : function (config: PPyConfig; list: PPyWideStringList; length: Py_ssize_t; items: PPWideChar): PyStatus; cdecl;
 
   // Not exported in Python 3.8 and implemented as functions - this has been fixed
   // TODO - deal with the following:
@@ -4032,10 +4019,15 @@ begin
 
   PyPreConfig_InitPythonConfig := Import('PyPreConfig_InitPythonConfig');
   PyPreConfig_InitIsolatedConfig := Import('PyPreConfig_InitIsolatedConfig');
-  PyConfig_InitPythonConfig := Import('PyConfig_InitPythonConfig');
+  PyConfig_InitPythonConfig   := Import('PyConfig_InitPythonConfig');
   PyConfig_InitIsolatedConfig := Import('PyConfig_InitIsolatedConfig');
-  PyConfig_Clear            := Import('PyConfig_Clear');
-  PyConfig_SetString       :=  Import('PyConfig_SetString');
+  PyConfig_Clear              := Import('PyConfig_Clear');
+  PyConfig_SetString          := Import('PyConfig_SetString');
+  PyConfig_SetBytesString     := Import('PyConfig_SetBytesString');
+  PyConfig_SetBytesArgv       := Import('PyConfig_SetBytesArgv');
+  PyConfig_SetArgv            := Import('PyConfig_SetArgv');
+  PyConfig_SetWideStringList  := Import('PyConfig_SetWideStringList');
+
 end;
 
 function TPythonInterface.Py_CompileString(s1,s2:PAnsiChar;i:integer):PPyObject;
@@ -4653,20 +4645,21 @@ begin
 
     if pfDontWriteBytecodeFlag in PyFlags then
     begin
-      AConfig.check_hash_pycs_mode := 'never';
+      PyConfig_SetString(@AConfig,@AConfig.check_hash_pycs_mode,'never');
       AConfig.write_bytecode := 0;
     end;
 
     if FPythonPyCache <> '' then
-      AConfig.pycache_prefix := PWideChar(FPythonPyCache);
+      PyConfig_SetString(@AConfig,@AConfig.pycache_prefix,PWideChar(FPythonPyCache));
 
     if FPythonHome <> '' then
-      AConfig.home := PWideChar(FPythonHome);
+      PyConfig_SetString(@AConfig,@AConfig.home,PWideChar(FPythonHome));
 
     if FProgramName = '' then
       FProgramName := UTF8Decode(ParamStr(0));
-    if FProgramName = '' then
-      AConfig.program_name := PWideChar(FProgramName);
+
+    if FProgramName <> '' then
+      PyConfig_SetString(@AConfig,@AConfig.program_name,PWideChar(FProgramName));
 
     AStatus := Py_InitializeFromConfig(@AConfig);
     if PyStatus_Exception(AStatus)<>0 then
