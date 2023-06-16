@@ -4622,6 +4622,14 @@ var
   APreconfig: PyPreConfig;
   AConfig: PyConfig;
   Astatus: PyStatus ;
+
+  argc : Integer;
+  wargv : array of PWideChar;
+  {$IFDEF POSIX}
+  UCS4L : array of UCS4String;
+  {$ELSE}
+  WL : array of UnicodeString;
+  {$ENDIF}
 begin
   if Assigned(gPythonEngine) then
     raise Exception.Create('There is already one instance of TPythonEngine running' );
@@ -4633,6 +4641,16 @@ begin
     //PyPreConfig_InitIsolatedConfig(@APreconfig);
 
     AssignPyFlags;
+
+    if Assigned(Py_SetProgramName) then
+    begin
+      if FProgramName = '' then
+        FProgramName := UnicodeString(ParamStr(0));
+      Py_SetProgramName(PWideChar(FProgramName));
+    end;
+    if FPythonHome <> '' then
+      Py_SetPythonHome(PWideChar(FPythonHome));
+
 
     // https://docs.python.org/3/c-api/init_config.html
     PyConfig_InitIsolatedConfig(@AConfig);
@@ -4661,23 +4679,39 @@ begin
     if FProgramName <> '' then
       PyConfig_SetString(@AConfig,@AConfig.program_name,PWideChar(FProgramName));
 
+    argc := ParamCount;
+    SetLength(wargv, argc + 1);
+    // build the PWideChar array
+    {$IFDEF POSIX}
+    // Note that Linux uses UCS4 strings, whereas it declares using UCS2 strings!!!
+    SetLength(UCS4L, argc+1);
+    for i := 0 to argc do begin
+      UCS4L[i] := WideStringToUCS4String(ParamStr(i));
+      wargv[i] := @UCS4L[i][0];
+    end;
+    {$ELSE}
+    SetLength(WL, argc+1);
+    for i := 0 to argc do begin
+      WL[i] := UnicodeString(ParamStr(i));
+      wargv[i] := PWideChar(WL[i]);
+    end;
+    {$ENDIF}
+
+    if InitSysArgv then
+    begin
+      AConfig.parse_argv := 1;
+      PyConfig_SetArgv(@AConfig,argc + 1, PWideChar(wargv));
+
+    end;
+
     AStatus := Py_InitializeFromConfig(@AConfig);
     if PyStatus_Exception(AStatus)<>0 then
       raise Exception.Create('Unable to initialize python');
+
     PyConfig_Clear(@AConfig);
 
-    //CheckRegistry; //AT: disabled
-    {
-    if Assigned(Py_SetProgramName) then
-    begin
-      if FProgramName = '' then
-        FProgramName := UnicodeString(ParamStr(0));
-      Py_SetProgramName(PWideChar(FProgramName));
-    end;
-    if FPythonHome <> '' then
-      Py_SetPythonHome(PWideChar(FPythonHome));
-    Py_Initialize;
-    }
+
+    //Py_Initialize;
 
     if Assigned(Py_IsInitialized) then
       FInitialized := Py_IsInitialized() <> 0
@@ -4685,8 +4719,10 @@ begin
       FInitialized := True;
     FIORedirected := False;
     InitSysPath;
+
     if InitSysArgv then
       SetProgramArgs;
+
     GetTimeStructType;
     GetDateTimeTypes;
     if InitThreads and Assigned(PyEval_InitThreads) then
