@@ -2210,7 +2210,7 @@ type
 
   protected
     procedure Initialize;
-    procedure  Finalize;
+    procedure Finalize;
     procedure AfterLoad; override;
     procedure BeforeLoad; override;
     procedure DoOpenDll(const aDllName : String); override;
@@ -2232,6 +2232,7 @@ type
 
   public
     InitSysArgv: Boolean;
+    FullIsolatedInitialization: Boolean;
     // Constructors & Destructors
     constructor Create(AOwner: TComponent); override;
     destructor  Destroy; override;
@@ -3637,11 +3638,11 @@ begin
 
   Py_IgnoreEnvironmentFlag   := Import('Py_IgnoreEnvironmentFlag');
 
-  // Hack TRanquilIT
-  Py_NoUserSiteDirectory := Import('Py_NoUserSiteDirectory');
-  Py_UnbufferedStdioFlag := Import('Py_UnbufferedStdioFlag');
-  Py_IsolatedFlag := Import('Py_IsolatedFlag');
-  Py_DontWriteBytecodeFlag := Import('Py_DontWriteBytecodeFlag');
+  // Hack TranquilIT
+  Py_NoUserSiteDirectory     := Import('Py_NoUserSiteDirectory');
+  Py_UnbufferedStdioFlag     := Import('Py_UnbufferedStdioFlag');
+  Py_IsolatedFlag            := Import('Py_IsolatedFlag');
+  Py_DontWriteBytecodeFlag   := Import('Py_DontWriteBytecodeFlag');
 
   Py_None                    := Import('_Py_NoneStruct');
   Py_Ellipsis                := Import('_Py_EllipsisObject');
@@ -4617,134 +4618,114 @@ procedure TPythonEngine.Initialize;
     end;
   end;
 
+  procedure InitializeIsolated;
+  var
+    AConfig: PyConfig;
+    Astatus: PyStatus ;
+  begin
+    // https://docs.python.org/3/c-api/init_config.html
+    PyConfig_InitIsolatedConfig(@AConfig);
+    try
+      if InitSysArgv then
+      begin
+        AConfig.parse_argv := 1;
+        AStatus := PyConfig_SetBytesArgv(@AConfig, argc, Pointer(argv));
+      end
+      else
+        AConfig.parse_argv := 0;
+
+      // already set by AssignPyFlags
+      AConfig.isolated := -1;
+      AConfig.buffered_stdio := -1;
+      AConfig.user_site_directory := -1;
+      AConfig.parser_debug := -1;
+
+      if pfDontWriteBytecodeFlag in PyFlags then
+      begin
+        PyConfig_SetString(@AConfig,@AConfig.check_hash_pycs_mode,'never');
+        AConfig.write_bytecode := 0;
+      end;
+
+      if FPythonPyCache <> '' then
+        PyConfig_SetString(@AConfig,@AConfig.pycache_prefix,PWideChar(FPythonPyCache));
+
+      {# already set by Py_SetPythonHome
+      if FPythonHome <> '' then
+        PyConfig_SetString(@AConfig,@AConfig.home,PWideChar(FPythonHome));
+      }
+
+      {# already set by Py_SetProgramName
+      if FProgramName = '' then
+        FProgramName := UTF8Decode(ParamStr(0));
+
+      if FProgramName <> '' then
+        PyConfig_SetString(@AConfig,@AConfig.program_name,PWideChar(FProgramName));
+      }
+
+      AStatus := Py_InitializeFromConfig(@AConfig);
+      if PyStatus_Exception(AStatus)<>0 then
+        raise Exception.Create('Unable to initialize python');
+      PyConfig_Clear(@AConfig);
+    except
+      PyConfig_Clear(@Aconfig);
+      if (PyStatus_IsExit(AStatus)=1) then
+        system.ExitCode := AStatus.exitcode
+      else
+        Raise;
+    end;
+  end;
+
 var
   i : Integer;
-  APreconfig: PyPreConfig;
-  AConfig: PyConfig;
-  Astatus: PyStatus ;
 
-  argc : Integer;
-  wargv : array of PWideChar;
-  {$IFDEF POSIX}
-  UCS4L : array of UCS4String;
-  {$ELSE}
-  WL : array of UnicodeString;
-  {$ENDIF}
 begin
   if Assigned(gPythonEngine) then
     raise Exception.Create('There is already one instance of TPythonEngine running' );
 
   gPythonEngine := Self;
-  try
 
-    // Initialize default preconfig
-    //PyPreConfig_InitIsolatedConfig(@APreconfig);
+  AssignPyFlags;
 
-    AssignPyFlags;
-
-    if Assigned(Py_SetProgramName) then
-    begin
-      if FProgramName = '' then
-        FProgramName := UnicodeString(ParamStr(0));
-      Py_SetProgramName(PWideChar(FProgramName));
-    end;
-    if FPythonHome <> '' then
-      Py_SetPythonHome(PWideChar(FPythonHome));
-
-
-    // https://docs.python.org/3/c-api/init_config.html
-    PyConfig_InitIsolatedConfig(@AConfig);
-
-    // already set by AssignPyFlags
-    AConfig.isolated := -1;
-    AConfig.buffered_stdio := -1;
-    AConfig.user_site_directory := -1;
-    AConfig.parser_debug := -1;
-
-    if pfDontWriteBytecodeFlag in PyFlags then
-    begin
-      PyConfig_SetString(@AConfig,@AConfig.check_hash_pycs_mode,'never');
-      AConfig.write_bytecode := 0;
-    end;
-
-    if FPythonPyCache <> '' then
-      PyConfig_SetString(@AConfig,@AConfig.pycache_prefix,PWideChar(FPythonPyCache));
-
-    if FPythonHome <> '' then
-      PyConfig_SetString(@AConfig,@AConfig.home,PWideChar(FPythonHome));
-
+  if Assigned(Py_SetProgramName) then
+  begin
     if FProgramName = '' then
-      FProgramName := UTF8Decode(ParamStr(0));
-
-    if FProgramName <> '' then
-      PyConfig_SetString(@AConfig,@AConfig.program_name,PWideChar(FProgramName));
-
-    argc := ParamCount;
-    SetLength(wargv, argc + 1);
-    // build the PWideChar array
-    {$IFDEF POSIX}
-    // Note that Linux uses UCS4 strings, whereas it declares using UCS2 strings!!!
-    SetLength(UCS4L, argc+1);
-    for i := 0 to argc do begin
-      UCS4L[i] := WideStringToUCS4String(ParamStr(i));
-      wargv[i] := @UCS4L[i][0];
-    end;
-    {$ELSE}
-    SetLength(WL, argc+1);
-    for i := 0 to argc do begin
-      WL[i] := UnicodeString(ParamStr(i));
-      wargv[i] := PWideChar(WL[i]);
-    end;
-    {$ENDIF}
-
-    if InitSysArgv then
-    begin
-      AConfig.parse_argv := 1;
-      PyConfig_SetArgv(@AConfig,argc + 1, PWideChar(wargv));
-
-    end;
-
-    AStatus := Py_InitializeFromConfig(@AConfig);
-    if PyStatus_Exception(AStatus)<>0 then
-      raise Exception.Create('Unable to initialize python');
-
-    PyConfig_Clear(@AConfig);
-
-
-    //Py_Initialize;
-
-    if Assigned(Py_IsInitialized) then
-      FInitialized := Py_IsInitialized() <> 0
-    else
-      FInitialized := True;
-    FIORedirected := False;
-    InitSysPath;
-
-    if InitSysArgv then
-      SetProgramArgs;
-
-    GetTimeStructType;
-    GetDateTimeTypes;
-    if InitThreads and Assigned(PyEval_InitThreads) then
-      PyEval_InitThreads;
-    if RedirectIO and Assigned(FIO) then
-      DoRedirectIO;
-    for i := 0 to ClientCount - 1 do
-      with Clients[i] do
-        if not Initialized then
-          Initialize;
-    if InitScript.Count > 0 then
-      ExecStrings( InitScript );
-    if Assigned(FOnAfterInit) then
-      FOnAfterInit(Self);
-
-  except
-    PyConfig_Clear(@Aconfig);
-    if (PyStatus_IsExit(AStatus)=1) then
-      system.ExitCode := AStatus.exitcode
-    else
-      Raise;
+      FProgramName := UnicodeString(ParamStr(0));
+    Py_SetProgramName(PWideChar(FProgramName));
   end;
+
+  if FPythonHome <> '' then
+    Py_SetPythonHome(PWideChar(FPythonHome));
+
+  if FullIsolatedInitialization then
+    InitializeIsolated
+  else
+  begin
+    Py_Initialize;
+	if InitSysArgv then
+      SetProgramArgs;
+  end;
+  if Assigned(Py_IsInitialized) then
+    FInitialized := Py_IsInitialized() <> 0
+  else
+    FInitialized := True;
+  FIORedirected := False;
+  InitSysPath;
+
+  GetTimeStructType;
+  GetDateTimeTypes;
+  if InitThreads and Assigned(PyEval_InitThreads) then
+    PyEval_InitThreads;
+  if RedirectIO and Assigned(FIO) then
+    DoRedirectIO;
+  for i := 0 to ClientCount - 1 do
+    with Clients[i] do
+      if not Initialized then
+        Initialize;
+  if InitScript.Count > 0 then
+    ExecStrings( InitScript );
+  if Assigned(FOnAfterInit) then
+    FOnAfterInit(Self);
+
 end;
 
 procedure TPythonEngine.SetInitScript(Value: TStrings);
