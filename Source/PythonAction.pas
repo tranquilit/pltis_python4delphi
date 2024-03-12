@@ -156,7 +156,7 @@ var
         s: string;
 begin
   Result := nil;
-  with GetPythonEngine dso
+  with GetPythonEngine do
     if (PyArg_ParseTuple( args, 'O',@func) = 0) or
        (RegisteredMethods.IndexOf(func) = -1) then
     begin

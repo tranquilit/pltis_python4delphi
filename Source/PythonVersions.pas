@@ -1,7 +1,6 @@
 {-----------------------------------------------------------------------------
  Unit Name: PythonVersions
- Author:    Kiriakos
- Date:      PyScripter
+ Author:    PyScripter
  Purpose:   Discover and get info about Python versions
             Part of the Python for Delphi library
 
@@ -10,24 +9,17 @@
 
 unit PythonVersions;
 
-{$mode delphi}
-{$modeswitch typehelpers}
-{$modeSwitch advancedRecords}
-
 interface
 Uses
   Classes;
 
 type
 
-  { TPythonVersion }
-
   TPythonVersion = record
   private
     FDisplayName: string;
     FHelpFile: string;
     fSysArchitecture : string;
-    fPythonExecutable: String;
     function GetDLLName: string;
     function ExpectedArchitecture:string;
     function GetIsPython3K: Boolean;
@@ -47,9 +39,8 @@ type
     function Is_venv: Boolean;
     function Is_virtualenv: Boolean;
     function Is_conda: Boolean;
-    function HasCustomExecutable: Boolean;
     procedure AssignTo(PythonEngine: TPersistent);
-    property PythonExecutable: string read GetPythonExecutable write fPythonExecutable;
+    property PythonExecutable: string read GetPythonExecutable;
     property DLLName: string read GetDLLName;
     property SysArchitecture: string read GetSysArchitecture;
     property IsPython3K: Boolean read GetIsPython3K;
@@ -65,8 +56,7 @@ type
     The function result has the semantics of Delphi compare functions
     -1: A is bigger (newer), 0: equal versions, 1: B is bigger (newer)
   *)
-  function  CompareVersions(A, B : string) : Integer;
-
+  function CompareVersions(A, B : string) : Integer;
 
   {$IFDEF MSWINDOWS}
   (* Checks whether an executable was compiled for X64 *)
@@ -77,12 +67,15 @@ type
   function GetRegisteredPythonVersion(SysVersion: string;
     out PythonVersion: TPythonVersion): Boolean;
   (* Returns all registered Python versions *)
-  function GetRegisteredPythonVersions : TPythonVersions;
+  function GetRegisteredPythonVersions(const MinVersion: string = '0.0';
+    const MaxVersion: string = '100.100'): TPythonVersions;
   (* Returns the highest numbered registered Python version *)
-  function GetLatestRegisteredPythonVersion(out PythonVersion: TPythonVersion): Boolean;
-  {$ENDIF}
+  function GetLatestRegisteredPythonVersion(out PythonVersion: TPythonVersion;
+    const MinVersion: string = '0.0'; const MaxVersion: string = '100.100'): Boolean;
   function PythonVersionFromPath(const Path: string; out PythonVersion: TPythonVersion;
-     AcceptVirtualEnvs: Boolean = True): Boolean;
+    AcceptVirtualEnvs: Boolean = True; const MinVersion: string = '0.0';
+    const MaxVersion: string = '100.100'): Boolean;
+  {$ENDIF}
 
 implementation
 
@@ -100,26 +93,18 @@ Uses
 function TPythonVersion.GetDLLName: string;
 begin
   {$IFDEF MSWINDOWS}
-  Result := 'python' + SysVersion[1] + SysVersion[3] + '.dll';
+  Result := SysVersion;
+  Delete(Result, 2, 1);
+  Result := 'python' + Result + '.dll';
   {$ELSE}
-  {$ifdef DARWIN}
-  Result := 'libpython' + SysVersion + '.dylib';
-  {$else}
   Result := 'libpython' + SysVersion + '.so';
-  {$endif}
   {$ENDIF}
 end;
 
 function TPythonVersion.ExpectedArchitecture: string;
 begin
   Result := '';
-  {$IFDEF CPUX64}
-  Result := '64bit';
-  {$ENDIF}
-  {$IFDEF CPU64}
-  Result := '64bit';
-  {$ENDIF}
-  {$IFDEF CPU64bits}
+  {$IF Defined(CPUX64) or Defined(CPU64) or Defined(CPU64bits)}
   Result := '64bit';
   {$ENDIF}
   if Result = '' then
@@ -136,7 +121,7 @@ begin
     TPythonEngine(PythonEngine).DllPath := DLLPath;
     TPythonEngine(PythonEngine).APIVersion := ApiVersion;
     if Is_venv then begin
-      //TPythonEngine(PythonEngine).VenvPythonExe := PythonExecutable;
+      TPythonEngine(PythonEngine).VenvPythonExe := PythonExecutable;
       TPythonEngine(PythonEngine).SetPythonHome(DLLPath);
     end else if not IsRegistered or Is_conda then
       {
@@ -146,7 +131,7 @@ begin
          you need to add Format('%s;%0:s\Library\bin;', [Version.InstallPath]
          to your Windows path if it is not there already.
       }
-      //TPythonEngine(PythonEngine).SetPythonHome(InstallPath);
+      TPythonEngine(PythonEngine).SetPythonHome(InstallPath);
   end;
 end;
 
@@ -181,17 +166,24 @@ end;
 function TPythonVersion.GetHelpFile: string;
 var
   PythonHelpFilePath: string;
+  HtmlIndex: string;
   Res: Integer;
   SR: TSearchRec;
 begin
   Result := FHelpFile;
-  // for unregistered Python
-  if (Result = '') and (InstallPath <> '') then
+  // for unregistered Python or python 11
+  if ((Result = '') or (ExtractFileExt(Result) = '.html')) and (InstallPath <> '') then
   begin
-    PythonHelpFilePath := InstallPath + '\Doc\python*.chm';
+    PythonHelpFilePath := IncludeTrailingPathDelimiter(InstallPath) + 'Doc\python*.chm';
     Res := FindFirst(PythonHelpFilePath, faAnyFile, SR);
     if Res = 0 then
-      Result := InstallPath + '\Doc\' + SR.Name;
+      Result := IncludeTrailingPathDelimiter(InstallPath) + 'Doc\' + SR.Name
+    else if Result = '' then
+    begin
+      HtmlIndex := IncludeTrailingPathDelimiter(InstallPath) + 'Doc\html\index.html';
+      if FileExists(HtmlIndex) then
+        Result := HtmlIndex;
+    end;
     FindClose(SR);
   end;
 end;
@@ -207,15 +199,10 @@ end;
 
 function TPythonVersion.GetPythonExecutable: string;
 begin
-  if fPythonExecutable <> '' then
-    Result := fPythonExecutable
-  else
-  begin
-    Result := IncludeTrailingPathDelimiter(InstallPath) + 'python.exe';
-    if not FileExists(Result) then begin
-      Result := IncludeTrailingPathDelimiter(InstallPath) +  'Scripts' + PathDelim + 'python.exe';
-      if not FileExists(Result) then Result := '';
-    end;
+  Result := IncludeTrailingPathDelimiter(InstallPath) + 'python.exe';
+  if not FileExists(Result) then begin
+    Result := IncludeTrailingPathDelimiter(InstallPath) +  'Scripts' + PathDelim + 'python.exe';
+    if not FileExists(Result) then Result := '';
   end;
 end;
 
@@ -229,11 +216,6 @@ end;
 function TPythonVersion.Is_conda: Boolean;
 begin
   Result := DirectoryExists(IncludeTrailingPathDelimiter(InstallPath) + 'conda-meta');
-end;
-
-function TPythonVersion.HasCustomExecutable: Boolean;
-begin
-  Result := fPythonExecutable <> '';
 end;
 
 function TPythonVersion.Is_venv: Boolean;
@@ -300,7 +282,7 @@ var
 begin
   Result := FileExists(EXEName) and
     GetBinaryType(PChar(ExeName), Binarytype) and
-      (BinaryType <> SCS_32BIT_BINARY);
+      (BinaryType = SCS_64BIT_BINARY);
 end;
 
 function Isx64(const FileName: string): Boolean;
@@ -422,7 +404,8 @@ begin
   PythonVersion.IsRegistered := Result;
 end;
 
-function GetRegisteredPythonVersions : TPythonVersions;
+function GetRegisteredPythonVersions(const MinVersion: string = '0.0';
+  const MaxVersion: string = '100.100'): TPythonVersions;
 Var
   Count: Integer;
   I: Integer;
@@ -431,48 +414,57 @@ begin
   Count := 0;
   SetLength(Result, High(PYTHON_KNOWN_VERSIONS));
   for I := High(PYTHON_KNOWN_VERSIONS) downto 1 do
+  begin
+    if CompareVersions(PYTHON_KNOWN_VERSIONS[I].RegVersion, MaxVersion) < 0 then
+      continue;
+    if CompareVersions(PYTHON_KNOWN_VERSIONS[I].RegVersion, MinVersion) > 0 then
+      break;
     if GetRegisteredPythonVersion(PYTHON_KNOWN_VERSIONS[I].RegVersion, PythonVersion) then
     begin
       Result[Count] := PythonVersion;
       Inc(Count);
     end;
+  end;
   SetLength(Result, Count);
 end;
 
-function GetLatestRegisteredPythonVersion(out PythonVersion: TPythonVersion): Boolean;
+function GetLatestRegisteredPythonVersion(out PythonVersion: TPythonVersion;
+  const MinVersion: string = '0.0'; const MaxVersion: string = '100.100'): Boolean;
 Var
   I: Integer;
 begin
+  Result := False;
   for I := High(PYTHON_KNOWN_VERSIONS) downto 1 do
   begin
-    Result := GetRegisteredPythonVersion(PYTHON_KNOWN_VERSIONS[I].RegVersion, PythonVersion);
-    if Result then break;
+    if CompareVersions(PYTHON_KNOWN_VERSIONS[I].RegVersion, MaxVersion) < 0 then
+      continue;
+    if CompareVersions(PYTHON_KNOWN_VERSIONS[I].RegVersion, MinVersion) > 0 then
+      break;
+    if GetRegisteredPythonVersion(PYTHON_KNOWN_VERSIONS[I].RegVersion, PythonVersion) then
+      Exit(True);
   end;
 end;
-{$ENDIF}
 
 function PythonVersionFromPath(const Path: string; out PythonVersion: TPythonVersion;
-  AcceptVirtualEnvs: Boolean = True): Boolean;
+  AcceptVirtualEnvs: Boolean = True; const MinVersion: string = '0.0';
+  const MaxVersion: string = '100.100'): Boolean;
 
   function FindPythonDLL(APath : string): string;
   Var
-    FindFileData: TRawbyteSearchRec;
-    res : LongInt;
+    FindFileData: TWIN32FindData;
+    Handle : THandle;
     DLLFileName: string;
   begin
     Result := '';
-    res := FindFirst(APath + DirectorySeparator + {$ifdef WINDOWS}'python**.dll' {$else}{$ifdef DARWIN}'libpython**.dylib'{$else}'libpython**.so'{$endif}{$endif}, faAnyFile, FindFileData);
-    if res <> 0 then
-      Exit;  // not python dll/dylib/so
-    DLLFileName:= FindFileData.Name;
-    // skip if python3.dll/libpython3.dylib/libpython3.so was found
-    if DLLFileName = {$ifdef WINDOWS}'python3.dll' {$else}{$ifdef DARWIN}'libpython3.dylib'{$else}'libpython3.so'{$endif}{$endif} then
-      res := FindNext(FindFileData);
-    if res <> 0 then
-      Exit;
-    FindClose(FindFileData);
-    DLLFileName:= FindFileData.Name;
-    if Length(DLLFileName) = {$ifdef WINDOWS}12{$else}{$ifdef DARWIN}18{$else}15{$endif}{$endif} then
+    Handle := FindFirstFile(PWideChar(APath+'\python*.dll'), FindFileData);
+    if Handle = INVALID_HANDLE_VALUE then Exit;  // not python dll
+    DLLFileName:= FindFileData.cFileName;
+    // skip if python3.dll was found
+    if Length(DLLFileName) <= 11 then FindNextFile(Handle, FindFileData);
+    if Handle = INVALID_HANDLE_VALUE then Exit;
+    Windows.FindClose(Handle);
+    DLLFileName:= FindFileData.cFileName;
+    if Length(DLLFileName) > 11 then
       Result := DLLFileName;
   end;
 
@@ -524,14 +516,12 @@ begin
     Exit;
   end;
 
-  {$ifdef WINDOWS}
   // check if same platform
   try
     if {$IFDEF CPUX64}not {$ENDIF}IsEXEx64(DLLPath+'\python.exe') then Exit;
   except
     Exit;
   end;
-  {$endif}
   PythonVersion.DLLPath := DLLPath;
 
   SysVersion := SysVersionFromDLLName(DLLFileName);
@@ -539,12 +529,17 @@ begin
   PythonVersion.SysVersion := SysVersion;
   PythonVersion.fSysArchitecture := PythonVersion.ExpectedArchitecture;
 
-  for I := High(PYTHON_KNOWN_VERSIONS) downto 1 do
-    if PYTHON_KNOWN_VERSIONS[I].RegVersion = SysVersion then begin
-      Result := True;
-      break;
-    end;
+  if (CompareVersions(MinVersion, SysVersion) >= 0) and
+    (CompareVersions(MaxVersion, SysVersion) <= 0)
+  then
+    // Full search in case some python version is not supported
+    for I := High(PYTHON_KNOWN_VERSIONS) downto 1 do
+      if PYTHON_KNOWN_VERSIONS[I].RegVersion = SysVersion then begin
+        Result := True;
+        break;
+      end;
 end;
 
+{$ENDIF}
 
 end.

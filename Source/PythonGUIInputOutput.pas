@@ -137,7 +137,7 @@ begin
   if Assigned(FOnSendUniData) then
     inherited
   else
-    DisplayString( string(Data) );
+    DisplayString( Data );
 end;
 
 {------------------------------------------------------------------------------}
@@ -163,7 +163,7 @@ begin
   else
   begin
     InputQuery( 'Query from Python', 'Enter text', S);
-    Result := UnicodeString(S);
+    Result := S;
   end;
 end;
 
@@ -178,13 +178,22 @@ end;
 {------------------------------------------------------------------------------}
 procedure TPythonGUIInputOutput.WriteOutput;
 var
-  S : string;
+  S : IOString;
 begin
   if FQueue.Count = 0 then
     Exit;
-  S := FQueue.Strings[ 0 ];
-  FQueue.Delete(0);
-  DisplayString( S )
+
+  Lock;
+  try
+    while FQueue.Count > 0 do
+    begin
+      S := FQueue.Strings[ 0 ];
+      FQueue.Delete(0);
+      DisplayString( S );
+    end;
+  finally
+    Unlock;
+  end;
 end;
 
 {PUBLIC METHODS}
@@ -233,8 +242,9 @@ begin
     TMyCustomMemo(Output).Lines.Add(str);
 {$IFDEF MSWINDOWS}
     SendMessage( Output.Handle, em_ScrollCaret, 0, 0);
+    //SendMessage( Output.Handle, EM_LINESCROLL, 0, Output.Lines.Count);
 {$ENDIF}
-  end;
+  end;{if}
 end;
 
 {------------------------------------------------------------------------------}

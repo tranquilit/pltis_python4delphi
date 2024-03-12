@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
-  <Package Version="4">
+  <Package Version="5">
     <PathDelim Value="\"/>
     <Name Value="p4dlazlite"/>
     <Type Value="RunAndDesignTime"/>
@@ -13,6 +13,7 @@
       </SearchPaths>
       <Linking>
         <Debugging>
+          <RunWithoutDebug Value="True"/>
           <DebugInfoType Value="dsDwarf3"/>
         </Debugging>
       </Linking>
@@ -23,6 +24,7 @@
         <UnitName Value="PythonEngine"/>
       </Item1>
     </Files>
+    <CompatibilityMode Value="True"/>
     <RequiredPkgs Count="1">
       <Item1>
         <PackageName Value="FCL"/>
