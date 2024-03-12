@@ -9,17 +9,24 @@
 
 unit PythonVersions;
 
+{$mode delphi}
+{$modeswitch typehelpers}
+{$modeSwitch advancedRecords}
+
 interface
 Uses
   Classes;
 
 type
 
+  { TPythonVersion }
+
   TPythonVersion = record
   private
     FDisplayName: string;
     FHelpFile: string;
     fSysArchitecture : string;
+    fPythonExecutable: String;
     function GetDLLName: string;
     function ExpectedArchitecture:string;
     function GetIsPython3K: Boolean;
@@ -39,8 +46,9 @@ type
     function Is_venv: Boolean;
     function Is_virtualenv: Boolean;
     function Is_conda: Boolean;
+    function HasCustomExecutable: Boolean;
     procedure AssignTo(PythonEngine: TPersistent);
-    property PythonExecutable: string read GetPythonExecutable;
+    property PythonExecutable: string read GetPythonExecutable write fPythonExecutable;
     property DLLName: string read GetDLLName;
     property SysArchitecture: string read GetSysArchitecture;
     property IsPython3K: Boolean read GetIsPython3K;
@@ -97,7 +105,11 @@ begin
   Delete(Result, 2, 1);
   Result := 'python' + Result + '.dll';
   {$ELSE}
+  {$ifdef DARWIN}
+  Result := 'libpython' + SysVersion + '.dylib';
+  {$else}
   Result := 'libpython' + SysVersion + '.so';
+  {$endif}
   {$ENDIF}
 end;
 
@@ -121,7 +133,7 @@ begin
     TPythonEngine(PythonEngine).DllPath := DLLPath;
     TPythonEngine(PythonEngine).APIVersion := ApiVersion;
     if Is_venv then begin
-      TPythonEngine(PythonEngine).VenvPythonExe := PythonExecutable;
+      //TPythonEngine(PythonEngine).VenvPythonExe := PythonExecutable;
       TPythonEngine(PythonEngine).SetPythonHome(DLLPath);
     end else if not IsRegistered or Is_conda then
       {
@@ -131,7 +143,7 @@ begin
          you need to add Format('%s;%0:s\Library\bin;', [Version.InstallPath]
          to your Windows path if it is not there already.
       }
-      TPythonEngine(PythonEngine).SetPythonHome(InstallPath);
+      //TPythonEngine(PythonEngine).SetPythonHome(InstallPath);
   end;
 end;
 
@@ -199,10 +211,15 @@ end;
 
 function TPythonVersion.GetPythonExecutable: string;
 begin
-  Result := IncludeTrailingPathDelimiter(InstallPath) + 'python.exe';
-  if not FileExists(Result) then begin
-    Result := IncludeTrailingPathDelimiter(InstallPath) +  'Scripts' + PathDelim + 'python.exe';
-    if not FileExists(Result) then Result := '';
+  if fPythonExecutable <> '' then
+    Result := fPythonExecutable
+  else
+  begin
+    Result := IncludeTrailingPathDelimiter(InstallPath) + 'python.exe';
+    if not FileExists(Result) then begin
+      Result := IncludeTrailingPathDelimiter(InstallPath) +  'Scripts' + PathDelim + 'python.exe';
+      if not FileExists(Result) then Result := '';
+    end;
   end;
 end;
 
@@ -216,6 +233,11 @@ end;
 function TPythonVersion.Is_conda: Boolean;
 begin
   Result := DirectoryExists(IncludeTrailingPathDelimiter(InstallPath) + 'conda-meta');
+end;
+
+function TPythonVersion.HasCustomExecutable: Boolean;
+begin
+  Result := fPythonExecutable <> '';
 end;
 
 function TPythonVersion.Is_venv: Boolean;
@@ -276,6 +298,16 @@ begin
 end;
 
 {$IFDEF MSWINDOWS}
+
+const
+  SCS_32BIT_BINARY=0;
+  SCS_DOS_BINARY=1;
+  SCS_WOW_BINARY=2;
+  SCS_PIF_BINARY=3;
+  SCS_POSIX_BINARY=4;
+  SCS_OS216_BINARY=5;
+  SCS_64BIT_BINARY=6;
+
 function IsEXEx64(const EXEName: string): Boolean;
 var
   BinaryType: DWORD;
@@ -451,16 +483,16 @@ function PythonVersionFromPath(const Path: string; out PythonVersion: TPythonVer
 
   function FindPythonDLL(APath : string): string;
   Var
-    FindFileData: TWIN32FindData;
+    FindFileData: TWIN32FINDDATAW;
     Handle : THandle;
     DLLFileName: string;
   begin
     Result := '';
-    Handle := FindFirstFile(PWideChar(APath+'\python*.dll'), FindFileData);
+    Handle := FindFirstFileW(PWideChar(APath+'\python*.dll'), FindFileData);
     if Handle = INVALID_HANDLE_VALUE then Exit;  // not python dll
     DLLFileName:= FindFileData.cFileName;
     // skip if python3.dll was found
-    if Length(DLLFileName) <= 11 then FindNextFile(Handle, FindFileData);
+    if Length(DLLFileName) <= 11 then FindNextFileW(Handle, FindFileData);
     if Handle = INVALID_HANDLE_VALUE then Exit;
     Windows.FindClose(Handle);
     DLLFileName:= FindFileData.cFileName;
