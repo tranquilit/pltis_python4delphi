@@ -147,7 +147,11 @@ const
   PROT_WRITE  =2;
   PROT_EXEC   =4;
   MAP_PRIVATE =2;
-  MAP_ANON=$1000;  
+  {$IF defined(LINUX) or defined(ANDROID)}
+  MAP_ANON=$20;
+  {$else}
+  MAP_ANON=$1000; // darwin
+  {$endif}
 {$ENDIF}
 {$ENDIF}
 
@@ -172,14 +176,9 @@ begin
 	{$IFDEF MSWINDOWS}
     page:=VirtualAlloc(nil, PageSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 	{$ELSE}
-    {mmap does not seem to work on arm32..}
-    {$ifdef CPUARM32}
-    page := GetMem(PageSize);
-    {$else}
     {$WARN SYMBOL_PLATFORM OFF}
     page := mmap(Pointer($10000000), PageSize, PROT_NONE, MAP_PRIVATE or MAP_ANON, -1, 0);
     {$WARN SYMBOL_PLATFORM ON}
-    {$endif CPUARM32}
     if page=Pointer(-1) then //MMAP_FAILED result?
     begin
       ptr := nil;
@@ -196,11 +195,9 @@ begin
     {$ELSE}
     flags := PROT_READ or PROT_WRITE or PROT_EXEC;
     {$IFEND}
-    {$ifndef CPUARM32}
     if mprotect(page, PageSize, flags) <> 0 then
       raise EMProtectError.CreateFmt('MProtect error: %s', [
         SysErrorMessage({$IFDEF FPC}GetLastOSError{$ELSE}GetLastError{$ENDIF}())]);
-    {$endif CPUARM32}
   {$ENDIF}
     page^.next:=CodeMemPages;
     CodeMemPages:=page;
@@ -268,11 +265,7 @@ begin
 	  	  {$IFDEF MSWINDOWS}
           VirtualFree(page, 0, MEM_RELEASE);
 		  {$ELSE}
-          {$ifdef CPUARM32}
-          FreeMem(page);
-          {$else}
           munmap(page,PageSize);
-          {$endif CPUARM32}
 		  {$ENDIF}
         end;
 
@@ -320,11 +313,7 @@ begin
   {$IFDEF MSWINDOWS}
     VirtualFree(page, 0, MEM_RELEASE);
   {$ELSE}
-    {$ifdef CPUARM32}
-    FreeMem(page);
-    {$else}
     munmap(page,PageSize);
-    {$endif CPUARM32}
   {$ENDIF}
 
     page := nextpage;
