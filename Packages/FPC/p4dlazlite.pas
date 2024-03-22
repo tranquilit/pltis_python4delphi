@@ -8,7 +8,7 @@ unit p4dlazlite;
 interface
 
 uses
-  PythonEngine, LazarusPackageIntf;
+  PythonEngine, MethodCallBack, PythonVersions, LazarusPackageIntf;
 
 implementation
 
