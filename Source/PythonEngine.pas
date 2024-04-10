@@ -6412,9 +6412,12 @@ procedure TPythonEngine.CheckError(ACatchStopEx : Boolean = False);
     Py_XDECREF(errvalue);
     Py_XDECREF(errtraceback);
     // TIS patched PythonEngine to get the exitcode into EValue
-    NewE := EPySystemExit.CreateResFmt(@SPyExcSystemError, [SErrValue]);
-    NewE.EValue := SErrValue;
-    raise NewE;
+    if SErrValue <> '0' then
+    begin
+      NewE := EPySystemExit.CreateResFmt(@SPyExcSystemError, [SErrValue]);
+      NewE.EValue := SErrValue;
+      raise NewE;
+    end;
   end;
 
 var
